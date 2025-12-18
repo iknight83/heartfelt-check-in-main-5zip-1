@@ -1,0 +1,4 @@
+project_id = "pvaoyomztzevhfqevkoo"
+
+[functions.generate-reset-action]
+verify_jwt = false
