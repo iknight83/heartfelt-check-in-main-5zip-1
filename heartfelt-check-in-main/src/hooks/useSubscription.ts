@@ -18,6 +18,7 @@ interface UseSubscriptionResult {
 
 const TRIAL_DURATION_DAYS = 7;
 const SUBSCRIPTION_KEY = "deeper_insights_subscribed";
+const TRIAL_STARTED_KEY = "trial_started_at";
 
 // Count unique days with check-ins (multiple check-ins on same day = 1 day)
 const getUniqueCheckInDays = (): number => {
@@ -37,12 +38,24 @@ const getUniqueCheckInDays = (): number => {
 export const useSubscription = (): UseSubscriptionResult => {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [uniqueCheckInDays, setUniqueCheckInDays] = useState(0);
+  const [trialStartTime, setTrialStartTime] = useState<number | null>(null);
 
   // Initialize from localStorage
   useEffect(() => {
     const storedSubscription = localStorage.getItem(SUBSCRIPTION_KEY);
     if (storedSubscription === "true") {
       setIsSubscribed(true);
+    }
+
+    // Initialize trial start time for new users
+    let startTime = localStorage.getItem(TRIAL_STARTED_KEY);
+    if (!startTime && !storedSubscription) {
+      // First visit - set trial start time
+      startTime = Date.now().toString();
+      localStorage.setItem(TRIAL_STARTED_KEY, startTime);
+    }
+    if (startTime) {
+      setTrialStartTime(parseInt(startTime));
     }
 
     // Count unique check-in days
@@ -71,10 +84,19 @@ export const useSubscription = (): UseSubscriptionResult => {
       };
     }
 
-    // Trial is based on unique check-in days, not calendar time
-    // Missing days do NOT reset progress or show warnings
-    const trialDaysUsed = Math.min(uniqueCheckInDays, TRIAL_DURATION_DAYS);
-    const trialDaysRemaining = Math.max(0, TRIAL_DURATION_DAYS - uniqueCheckInDays);
+    // Trial is based on calendar time from first visit (7 days)
+    let trialDaysRemaining = TRIAL_DURATION_DAYS;
+    let trialDaysUsed = 0;
+
+    if (trialStartTime) {
+      const now = Date.now();
+      const millisecondsPerDay = 24 * 60 * 60 * 1000;
+      const daysSinceStart = (now - trialStartTime) / millisecondsPerDay;
+      
+      trialDaysUsed = Math.floor(daysSinceStart);
+      trialDaysRemaining = Math.max(0, TRIAL_DURATION_DAYS - trialDaysUsed);
+    }
+
     const isTrialActive = trialDaysRemaining > 0;
 
     return {
@@ -89,7 +111,7 @@ export const useSubscription = (): UseSubscriptionResult => {
       // Can only generate new patterns during trial or when subscribed
       canGenerateNewPatterns: isTrialActive,
     };
-  }, [isSubscribed, uniqueCheckInDays]);
+  }, [isSubscribed, trialStartTime]);
 
   const subscribe = () => {
     // Placeholder: In real implementation, this would trigger payment flow
