@@ -13,6 +13,14 @@ export const useAuth = () => {
       (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
+        
+        // Store user ID for data isolation
+        if (session?.user?.id) {
+          localStorage.setItem("current_user_id", session.user.id);
+        } else {
+          localStorage.removeItem("current_user_id");
+        }
+        
         setLoading(false);
       }
     );
@@ -21,6 +29,14 @@ export const useAuth = () => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
+      
+      // Store user ID for data isolation
+      if (session?.user?.id) {
+        localStorage.setItem("current_user_id", session.user.id);
+      } else {
+        localStorage.removeItem("current_user_id");
+      }
+      
       setLoading(false);
     });
 
@@ -75,15 +91,23 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
+    // Get current user ID before clearing it
+    const userId = localStorage.getItem("current_user_id");
+    
     // Clear onboarding state so user re-answers questions, but KEEP account data (factors, subscription)
     localStorage.removeItem("termsAcceptedAt");
     localStorage.removeItem("current_mood");
     localStorage.removeItem("mood_history");
-    localStorage.removeItem("daily_factor_counts");
-    // NOTE: We intentionally do NOT clear tracked_factors or subscription status
-    // so user's account data is restored when they sign back in
+    // Clear user-specific factor counts when signing out
+    if (userId) {
+      localStorage.removeItem(`daily_factor_counts__${userId}`);
+    }
     
     const { error } = await supabase.auth.signOut();
+    
+    // Clear user ID after sign out
+    localStorage.removeItem("current_user_id");
+    
     return { error };
   };
 

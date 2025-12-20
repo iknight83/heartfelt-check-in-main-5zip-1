@@ -18,6 +18,21 @@ interface DailyFactorCounts {
 const STORAGE_KEY = "tracked_factors";
 const DAILY_COUNTS_KEY = "daily_factor_counts";
 
+// Get user ID from localStorage to isolate data per user
+const getUserId = (): string | null => {
+  try {
+    return localStorage.getItem("current_user_id");
+  } catch {
+    return null;
+  }
+};
+
+// Get storage key with user isolation
+const getUserStorageKey = (baseKey: string): string => {
+  const userId = getUserId();
+  return userId ? `${baseKey}__${userId}` : baseKey;
+};
+
 // All available factors that can be tracked (original onboarding factors only)
 export const ALL_AVAILABLE_FACTORS = [
   { id: "caffeine", emoji: "☕", label: "Caffeine" },
@@ -34,7 +49,8 @@ const defaultFactors: TrackedFactor[] = [];
 // Get the base factors (without counts)
 export const getTrackedFactors = (): TrackedFactor[] => {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const key = getUserStorageKey(STORAGE_KEY);
+    const stored = localStorage.getItem(key);
     if (stored) {
       return JSON.parse(stored);
     }
@@ -47,7 +63,8 @@ export const getTrackedFactors = (): TrackedFactor[] => {
 // Get daily counts
 const getDailyCounts = (): DailyFactorCounts => {
   try {
-    const stored = localStorage.getItem(DAILY_COUNTS_KEY);
+    const key = getUserStorageKey(DAILY_COUNTS_KEY);
+    const stored = localStorage.getItem(key);
     if (stored) {
       return JSON.parse(stored);
     }
@@ -60,7 +77,8 @@ const getDailyCounts = (): DailyFactorCounts => {
 // Save daily counts
 const saveDailyCounts = (counts: DailyFactorCounts) => {
   try {
-    localStorage.setItem(DAILY_COUNTS_KEY, JSON.stringify(counts));
+    const key = getUserStorageKey(DAILY_COUNTS_KEY);
+    localStorage.setItem(key, JSON.stringify(counts));
   } catch (e) {
     console.error("Error saving daily counts to localStorage:", e);
   }
@@ -89,7 +107,8 @@ export const saveTrackedFactors = (factors: TrackedFactor[]) => {
     isCustom,
   }));
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(baseFactors));
+    const key = getUserStorageKey(STORAGE_KEY);
+    localStorage.setItem(key, JSON.stringify(baseFactors));
   } catch (e) {
     console.error("Error saving factors to localStorage:", e);
   }

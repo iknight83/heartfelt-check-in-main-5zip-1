@@ -75,16 +75,17 @@ const Index = () => {
   const handleAuthContinue = (method: "google" | "apple" | "anonymous" | "email") => {
     setSelections((prev) => ({ ...prev, authMethod: method }));
     
-    // If user is authenticated (existing account with sign-in), skip to home
-    // For new users or anonymous, continue with onboarding
-    if (method === "email" && user) {
-      // Email sign-in with existing user - restore their account and go to home
-      localStorage.setItem("termsAcceptedAt", new Date().toISOString());
-      // NOTE: Don't clear tracked_factors - they were preserved from sign-out
-      // so the user's account data is restored automatically
+    // Check if user already completed onboarding before (termsAcceptedAt is set)
+    const hasCompletedOnboarding = localStorage.getItem("termsAcceptedAt");
+    
+    // If user is authenticated with email AND already completed onboarding, they're returning - go to home
+    // Otherwise, continue with onboarding (new users need to answer questions again)
+    if (method === "email" && user && hasCompletedOnboarding) {
+      // Existing account with completed onboarding - go straight to home
+      // User's factors are already preserved in localStorage
       navigate("/home", { replace: true });
     } else {
-      // New user or anonymous - continue onboarding
+      // New user or returning user who needs to re-do onboarding - continue to reminder
       setStep("reminder");
     }
   };
