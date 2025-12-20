@@ -74,7 +74,18 @@ const Index = () => {
 
   const handleAuthContinue = (method: "google" | "apple" | "anonymous" | "email") => {
     setSelections((prev) => ({ ...prev, authMethod: method }));
-    setStep("reminder");
+    
+    // If user is authenticated (existing account with sign-in), skip to home
+    // For new users or anonymous, continue with onboarding
+    if (method === "email" && user) {
+      // Email sign-in with existing user - set onboarding as complete and go to home
+      localStorage.setItem("termsAcceptedAt", new Date().toISOString());
+      localStorage.setItem("tracked_factors", JSON.stringify([])); // Will be populated from their account
+      navigate("/home", { replace: true });
+    } else {
+      // New user or anonymous - continue onboarding
+      setStep("reminder");
+    }
   };
 
   const handleReminderEnable = (time: string) => {
