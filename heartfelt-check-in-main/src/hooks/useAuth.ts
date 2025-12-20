@@ -75,11 +75,10 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
-    // Clear local storage first
-    localStorage.removeItem("termsAcceptedAt");
-    localStorage.removeItem("tracked_factors");
-    localStorage.removeItem("daily_factor_counts");
-    localStorage.removeItem("mood_entries");
+    // Note: We intentionally do NOT clear onboarding state (termsAcceptedAt, tracked_factors)
+    // so that returning users can skip re-onboarding when they sign back in.
+    // Only clear current session data that should reset.
+    localStorage.removeItem("current_mood");
     
     const { error } = await supabase.auth.signOut();
     return { error };
