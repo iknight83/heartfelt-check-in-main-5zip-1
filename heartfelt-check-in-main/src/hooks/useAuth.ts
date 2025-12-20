@@ -75,13 +75,13 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
-    // Clear ALL local state when signing out - user starts fresh from beginning
+    // Clear onboarding state so user re-answers questions, but KEEP account data (factors, subscription)
     localStorage.removeItem("termsAcceptedAt");
-    localStorage.removeItem("tracked_factors");
-    localStorage.removeItem("daily_factor_counts");
     localStorage.removeItem("current_mood");
-    localStorage.removeItem("mood_entries");
     localStorage.removeItem("mood_history");
+    localStorage.removeItem("daily_factor_counts");
+    // NOTE: We intentionally do NOT clear tracked_factors or subscription status
+    // so user's account data is restored when they sign back in
     
     const { error } = await supabase.auth.signOut();
     return { error };
