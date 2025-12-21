@@ -91,18 +91,9 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
-    // Get current user ID before clearing it
-    const userId = localStorage.getItem("current_user_id");
-    
-    // Clear onboarding state so user re-answers questions, but KEEP account data (factors, subscription)
+    // Clear onboarding state so user re-answers questions on next login
+    // BUT KEEP all account data (factors, check-ins, subscription) for when they sign back in
     localStorage.removeItem("termsAcceptedAt");
-    
-    // Clear user-specific data when signing out
-    if (userId) {
-      localStorage.removeItem(`daily_factor_counts__${userId}`);
-      localStorage.removeItem(`current_mood__${userId}`);
-      localStorage.removeItem(`mood_history__${userId}`);
-    }
     
     const { error } = await supabase.auth.signOut();
     
