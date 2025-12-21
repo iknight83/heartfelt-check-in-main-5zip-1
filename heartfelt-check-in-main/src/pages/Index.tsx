@@ -24,7 +24,7 @@ interface UserSelections {
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
-  const [step, setStep] = useState<"emotions" | "duration" | "support" | "auth" | "reminder" | "factors" | "factorSelection" | "paywall">("emotions");
+  const [step, setStep] = useState<"emotions" | "duration" | "support" | "factorSelection" | "auth" | "reminder" | "paywall">("emotions");
   const [selections, setSelections] = useState<UserSelections>({
     emotions: [],
     duration: null,
@@ -69,7 +69,7 @@ const Index = () => {
 
   const handleSupportSelect = (hasSupport: boolean) => {
     setSelections((prev) => ({ ...prev, hasSupport }));
-    setStep("auth");
+    setStep("factorSelection");
   };
 
   const handleAuthContinue = (method: "google" | "apple" | "anonymous" | "email") => {
@@ -90,24 +90,19 @@ const Index = () => {
     }
   };
 
+  const handleFactorSelectionContinue = (factors: string[]) => {
+    setSelections((prev) => ({ ...prev, trackingFactors: factors }));
+    setStep("auth");
+  };
+
   const handleReminderEnable = (time: string) => {
     setSelections((prev) => ({ ...prev, reminderTime: time }));
     // TODO: Request notification permission here
-    setStep("factors");
+    setStep("paywall");
   };
 
   const handleReminderSkip = () => {
     setSelections((prev) => ({ ...prev, reminderTime: null }));
-    setStep("factors");
-  };
-
-  const handleFactorsChoose = () => {
-    setStep("factorSelection");
-  };
-
-
-  const handleFactorSelectionContinue = (factors: string[]) => {
-    setSelections((prev) => ({ ...prev, trackingFactors: factors }));
     setStep("paywall");
   };
 
@@ -143,20 +138,16 @@ const Index = () => {
     return <SupportCheckScreen onSelect={handleSupportSelect} onBack={() => setStep("duration")} />;
   }
 
+  if (step === "factorSelection") {
+    return <FactorSelectionScreen onContinue={handleFactorSelectionContinue} onBack={() => setStep("support")} />;
+  }
+
   if (step === "auth") {
-    return <JourneyAuthScreen onContinue={handleAuthContinue} onRegister={handleRegister} onBack={() => setStep("support")} />;
+    return <JourneyAuthScreen onContinue={handleAuthContinue} onRegister={handleRegister} onBack={() => setStep("factorSelection")} />;
   }
 
   if (step === "reminder") {
     return <ReminderScreen onEnable={handleReminderEnable} onSkip={handleReminderSkip} onBack={() => setStep("auth")} />;
-  }
-
-  if (step === "factors") {
-    return <FactorsPreviewScreen onChooseFactors={handleFactorsChoose} onBack={() => setStep("reminder")} />;
-  }
-
-  if (step === "factorSelection") {
-    return <FactorSelectionScreen onContinue={handleFactorSelectionContinue} onBack={() => setStep("factors")} />;
   }
 
   if (step === "paywall") {

@@ -14,6 +14,21 @@ const MOOD_HISTORY_KEY = "mood_history";
 
 const generateId = () => `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
 
+// Get user ID from localStorage to isolate mood data per user
+const getUserId = (): string | null => {
+  try {
+    return localStorage.getItem("current_user_id");
+  } catch {
+    return null;
+  }
+};
+
+// Get storage key with user isolation
+const getUserStorageKey = (baseKey: string): string => {
+  const userId = getUserId();
+  return userId ? `${baseKey}__${userId}` : baseKey;
+};
+
 const getDefaultMood = (): MoodEntry => ({
   id: generateId(),
   mood: "Uninspired",
@@ -26,7 +41,8 @@ const getDefaultMood = (): MoodEntry => ({
 export const useMoodState = () => {
   const [moodEntry, setMoodEntry] = useState<MoodEntry>(() => {
     try {
-      const stored = localStorage.getItem(STORAGE_KEY);
+      const key = getUserStorageKey(STORAGE_KEY);
+      const stored = localStorage.getItem(key);
       if (stored) {
         return JSON.parse(stored);
       }
@@ -38,7 +54,8 @@ export const useMoodState = () => {
 
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(moodEntry));
+      const key = getUserStorageKey(STORAGE_KEY);
+      localStorage.setItem(key, JSON.stringify(moodEntry));
     } catch (e) {
       console.error("Error saving mood to localStorage:", e);
     }
@@ -58,7 +75,8 @@ export const useMoodState = () => {
 // Helper to get current mood from localStorage (for components that don't use the hook)
 export const getCurrentMood = (): MoodEntry => {
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
+    const key = getUserStorageKey(STORAGE_KEY);
+    const stored = localStorage.getItem(key);
     if (stored) {
       return JSON.parse(stored);
     }
@@ -73,7 +91,8 @@ export const saveMood = (updates: Partial<MoodEntry>) => {
   const current = getCurrentMood();
   const updated = { ...current, ...updates, timestamp: Date.now() };
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    const key = getUserStorageKey(STORAGE_KEY);
+    localStorage.setItem(key, JSON.stringify(updated));
   } catch (e) {
     console.error("Error saving mood to localStorage:", e);
   }
@@ -83,7 +102,8 @@ export const saveMood = (updates: Partial<MoodEntry>) => {
 // Get mood history from localStorage
 export const getMoodHistory = (): MoodEntry[] => {
   try {
-    const stored = localStorage.getItem(MOOD_HISTORY_KEY);
+    const key = getUserStorageKey(MOOD_HISTORY_KEY);
+    const stored = localStorage.getItem(key);
     if (stored) {
       return JSON.parse(stored);
     }
@@ -115,7 +135,8 @@ export const addMoodToHistory = (
   const updatedHistory = [newEntry, ...history];
   
   try {
-    localStorage.setItem(MOOD_HISTORY_KEY, JSON.stringify(updatedHistory));
+    const key = getUserStorageKey(MOOD_HISTORY_KEY);
+    localStorage.setItem(key, JSON.stringify(updatedHistory));
   } catch (e) {
     console.error("Error saving mood history to localStorage:", e);
   }
@@ -137,7 +158,8 @@ export const updateMoodInHistory = (
   history[index] = updatedEntry;
   
   try {
-    localStorage.setItem(MOOD_HISTORY_KEY, JSON.stringify(history));
+    const key = getUserStorageKey(MOOD_HISTORY_KEY);
+    localStorage.setItem(key, JSON.stringify(history));
   } catch (e) {
     console.error("Error updating mood in localStorage:", e);
   }
@@ -151,7 +173,8 @@ export const deleteMoodFromHistory = (id: string): void => {
   const updatedHistory = history.filter(entry => entry.id !== id);
   
   try {
-    localStorage.setItem(MOOD_HISTORY_KEY, JSON.stringify(updatedHistory));
+    const key = getUserStorageKey(MOOD_HISTORY_KEY);
+    localStorage.setItem(key, JSON.stringify(updatedHistory));
   } catch (e) {
     console.error("Error deleting mood from localStorage:", e);
   }

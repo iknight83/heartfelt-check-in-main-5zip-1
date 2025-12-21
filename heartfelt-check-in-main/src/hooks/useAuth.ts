@@ -96,11 +96,12 @@ export const useAuth = () => {
     
     // Clear onboarding state so user re-answers questions, but KEEP account data (factors, subscription)
     localStorage.removeItem("termsAcceptedAt");
-    localStorage.removeItem("current_mood");
-    localStorage.removeItem("mood_history");
-    // Clear user-specific factor counts when signing out
+    
+    // Clear user-specific data when signing out
     if (userId) {
       localStorage.removeItem(`daily_factor_counts__${userId}`);
+      localStorage.removeItem(`current_mood__${userId}`);
+      localStorage.removeItem(`mood_history__${userId}`);
     }
     
     const { error } = await supabase.auth.signOut();

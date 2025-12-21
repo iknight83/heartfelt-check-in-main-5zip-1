@@ -1,0 +1,90 @@
+❌ PROBLEM 1 (clearly named)
+
+Daily check-ins are NOT persisted after sign-out and sign-in.
+
+When a user logs a daily check-in
+
+Signs out
+
+Signs back in
+👉 The check-in entries are gone
+
+Meanwhile:
+
+✅ Tracked factors ARE saved correctly
+
+❌ Daily check-ins are NOT
+
+This confirms the issue is specific to check-in storage, not general persistence.
+
+🎯 What this means (root cause, plain English)
+
+Your app is likely doing one of these:
+
+Saving daily check-ins to local state only
+
+Saving check-ins to temporary storage
+
+Not associating check-ins with the authenticated user ID
+
+Clearing check-ins on logout without rehydrating them on login
+
+Factors are probably stored:
+
+In persistent storage
+
+Or correctly linked to user/session
+
+Check-ins are not.
+
+This is a data persistence bug, not a UI bug.
+
+✅ EXPECTED CORRECT BEHAVIOR
+
+Daily check-ins must be persisted per user
+
+On sign-in:
+
+The app should reload all past check-ins
+
+On sign-out:
+
+Data should NOT be deleted (unless user deletes it)
+
+Anonymous users:
+
+Check-ins stored locally
+
+Logged-in users:
+
+Check-ins stored and reloaded from persistent storage
+
+✅ REPLIT PROMPT (COPY–PASTE EXACTLY)
+
+Use this prompt only for this issue:
+
+BUG FIX: Daily check-ins are not being saved across sign-out and sign-in.
+
+Current behavior:
+- User creates daily check-ins.
+- User signs out.
+- User signs back in.
+- Daily check-ins are missing.
+- Tracked factors remain saved correctly.
+
+This confirms the issue is specific to daily check-in persistence.
+
+Required fix:
+1. Ensure daily check-ins are stored in persistent storage, not local component state.
+2. Associate each daily check-in with the authenticated user ID.
+3. On app launch or user sign-in:
+   - Load all saved daily check-ins for the current user.
+4. On sign-out:
+   - Do NOT delete or clear persisted daily check-ins.
+5. Ensure anonymous users still store check-ins locally.
+6. Ensure logged-in users retrieve their check-ins after signing back in.
+7. Do NOT change UI or check-in logic.
+8. Do NOT affect tracked factors (they already work correctly).
+
+Goal:
+Daily check-ins must persist reliably across sign-out and sign-in, just like tr
