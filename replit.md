@@ -1,0 +1,73 @@
+# Heartfelt Check-In
+
+## Overview
+
+Heartfelt Check-In is a mood tracking and emotional wellness application built with React and TypeScript. The app helps users log daily emotional check-ins, track lifestyle factors that may influence their mood, and discover patterns in their emotional data over time. It features a guided onboarding flow, anonymous or email-based authentication via Supabase, and a subscription/trial system for premium insights.
+
+## User Preferences
+
+Preferred communication style: Simple, everyday language.
+
+## System Architecture
+
+### Frontend Architecture
+- **Framework**: React 18 with TypeScript, using Vite as the build tool
+- **Routing**: React Router v6 for client-side navigation
+- **State Management**: React hooks with localStorage for persistence; React Query for server state management
+- **UI Components**: Radix UI primitives with shadcn/ui component library
+- **Styling**: Tailwind CSS with CSS custom properties for theming (dark mode by default)
+
+### Data Persistence Strategy
+- **Primary Storage**: localStorage with user-scoped keys (format: `{key}__{userId}`)
+- **User Isolation**: All mood data, factor counts, and settings are keyed by user ID to support multi-user scenarios
+- **Anonymous Users**: Generate a session-based anonymous ID stored locally; all data is intentionally cleared on sign-out
+- **Data Migration**: On authentication, pending onboarding data is migrated from global keys to user-scoped keys
+
+### Authentication Flow
+- **Provider**: Supabase Auth (email/password and anonymous authentication)
+- **Anonymous Mode**: Users can use the app without an account; data persists only for the current session
+- **Onboarding Gate**: New users must complete a multi-step onboarding flow (emotions → duration → support → factors → auth → reminder → paywall) before accessing the main app
+- **Completion Tracking**: `termsAcceptedAt` timestamp stored per-user indicates onboarding completion
+
+### Key Data Models
+- **MoodEntry**: Contains mood label, triggers, timestamp, notes, and unique ID
+- **TrackedFactor**: User-selected lifestyle factors (caffeine, alcohol, exercise, etc.) with daily counts
+- **DailyFactorCounts**: Nested object keyed by date and factor ID for tracking factor values per day
+
+### Subscription System
+- **Trial Period**: 7-day free trial based on unique days with check-ins
+- **Plans**: Monthly, annual, and lifetime subscription tiers (payment integration is placeholder)
+- **Feature Gating**: Confidence levels for insights are restricted based on subscription status
+
+### Data Persistence Implementation (Fixed Dec 2025)
+The app now uses a robust data migration pattern:
+
+1. **User-Isolated Storage**: All data uses keys in format `{key}__{userId}` for proper isolation
+2. **Data Migration**: `migratePendingDataToUser()` migrates global keys to user-scoped keys on auth:
+   - Runs in `onAuthStateChange` listener (for new sign-ins)
+   - Runs in `getSession()` resolution (for returning users with existing sessions)
+   - Runs in `signInAnonymously()` (for anonymous users after Supabase provides user ID)
+3. **Anonymous Users**: Sign-out clears ALL data including termsAcceptedAt
+4. **Email Users**: Sign-out preserves termsAcceptedAt so they skip onboarding on return
+5. **Legacy Support**: Index.tsx checks both user-scoped and global termsAcceptedAt keys for backwards compatibility
+
+## External Dependencies
+
+### Authentication & Backend
+- **Supabase**: Authentication (email, anonymous), with potential for database storage (currently localStorage-focused)
+
+### Mobile Capabilities
+- **Capacitor**: Native mobile app wrapper with local notifications plugin for reminder functionality
+
+### UI Libraries
+- **Radix UI**: Accessible, unstyled component primitives (dialog, popover, dropdown, tabs, etc.)
+- **shadcn/ui**: Pre-built component configurations using Radix + Tailwind
+- **Lucide React**: Icon library
+- **date-fns**: Date manipulation and formatting
+- **Embla Carousel**: Carousel/slider functionality
+
+### Development Tools
+- **Vite**: Build tool and dev server (port 5000)
+- **TypeScript**: Type safety with relaxed strictness settings
+- **ESLint**: Code linting with React hooks and refresh plugins
+- **lovable-tagger**: Development component tagging (Lovable platform integration)
