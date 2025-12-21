@@ -7,14 +7,16 @@ import AddFactorModal from "@/components/home/AddFactorModal";
 import LatestMoods from "@/components/home/LatestMoods";
 import { getMoodHistory, deleteMoodFromHistory, MoodEntry } from "@/hooks/useMoodState";
 import { useTrackedFactors, ALL_AVAILABLE_FACTORS } from "@/hooks/useTrackedFactors";
+import { useAuth } from "@/hooks/useAuth";
 
 type NavTab = "home" | "insights" | "you";
 
 const Home = () => {
+  const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<NavTab>("home");
   const [showAddFactorModal, setShowAddFactorModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
-  const [moodHistory, setMoodHistory] = useState<MoodEntry[]>(getMoodHistory);
+  const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
   const { factors, incrementFactor, decrementFactor, addFactor } = useTrackedFactors(selectedDate);
 
   // Get factors that are not yet being tracked
@@ -30,17 +32,19 @@ const Home = () => {
     });
   }, [moodHistory, selectedDate]);
 
-  // Refresh mood data when page gains focus
+  // Refresh mood data when page gains focus or user ID changes
+  // This ensures moods are loaded AFTER user authentication is complete
   useEffect(() => {
     const handleFocus = () => {
       setMoodHistory(getMoodHistory());
     };
     
     window.addEventListener("focus", handleFocus);
+    // Load moods after user ID is available (when user is authenticated or anonymous)
     setMoodHistory(getMoodHistory());
     
     return () => window.removeEventListener("focus", handleFocus);
-  }, []);
+  }, [user]); // Re-run when user changes (after auth completes)
 
   const handleAddFactor = () => {
     setShowAddFactorModal(true);

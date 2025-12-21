@@ -1,0 +1,140 @@
+❌ PROBLEM 1 — FINAL, PRECISE NAME
+
+Daily check-ins are not persisted to user storage and are lost on reload or re-authentication.
+
+This is not just a sign-out issue anymore.
+
+From your screenshots:
+
+You add a daily check-in (“Meh” at 12:25)
+
+You reload / re-enter / re-auth
+
+The check-in is gone
+
+The UI resets to “Add your first check in”
+
+Factors remain saved
+
+👉 This confirms daily check-ins are never truly persisted, even for the same session lifecycle.
+
+🧠 What is ACTUALLY wrong (root cause)
+
+One (or more) of these is happening:
+
+Daily check-ins are stored in React state only
+
+OR stored in a temporary in-memory store
+
+OR written to storage but never read back
+
+OR written under the wrong key / schema
+
+OR cleared by a date re-initialization effect
+
+OR not associated with userId + date
+
+Meanwhile:
+
+Factors are correctly persisted and rehydrated
+
+So your storage layer itself works
+
+This is a write/read mismatch, not auth.
+
+✅ What CORRECT behavior must be (non-negotiable)
+
+For each daily check-in:
+
+It must be saved to persistent storage (local DB, IndexedDB, Supabase, etc.)
+
+It must include:
+
+userId (or anonymousId)
+
+date (YYYY-MM-DD)
+
+mood
+
+timestamp
+
+On every page load, the app must:
+
+Load today’s check-in (if it exists)
+
+Render it instead of “Add your first check in”
+
+🚨 IMPORTANT: why previous fixes didn’t work
+
+Your previous prompt was too abstract.
+
+Replit likely:
+
+Added a save call
+
+But never wired the rehydration
+
+Or didn’t fix the date-based overwrite
+
+So we now need a hard instruction:
+👉 Persist + rehydrate + don’t overwrite
+
+✅ STRONG REPLIT PROMPT (COPY–PASTE EXACTLY)
+
+Use this instead of the previous one:
+
+CRITICAL BUG FIX — Daily check-ins are not being persisted or reloaded.
+
+Observed behavior:
+- User adds a daily check-in (e.g. mood “Meh”).
+- On reload, navigation, or re-authentication:
+  - The daily check-in disappears.
+  - UI shows “Add your first check in”.
+- Tracked factors persist correctly.
+
+Conclusion:
+Daily check-ins are NOT being properly saved and/or rehydrated.
+
+Required fix (do ALL of the following):
+
+1. Persist each daily check-in to permanent storage (not React state).
+2. Store check-ins with:
+   - userId (or anonymousId)
+   - date (YYYY-MM-DD)
+   - mood value
+   - timestamp
+3. On app load AND on date change:
+   - Query storage for an existing check-in for the current user and date.
+   - If found, render it instead of the empty state.
+4. Do NOT overwrite or clear existing check-ins when:
+   - The page reloads
+   - The user navigates
+   - The user signs out and back in
+5. Ensure the check-in save and load logic mirrors how tracked factors already persist.
+6. Do NOT change UI design, copy, or user flow.
+7. Add logging (temporarily if needed) to confirm:
+   - Check-in is saved
+   - Check-in is retrieved
+   - Correct date key is used
+
+Goal:
+Daily check-ins must persist reliably and reappear every time the user returns, just like tracked factors.
+
+✅ HOW YOU KNOW IT’S FIXED (very important)
+
+Test exactly this:
+
+Add a daily check-in
+
+Reload the page
+
+Navigate away and back
+
+Sign out
+
+Sign back in
+
+Change date forward/back
+
+✅ The check-in must still show
+❌ If it disappears at ANY step → persistence is still broken
