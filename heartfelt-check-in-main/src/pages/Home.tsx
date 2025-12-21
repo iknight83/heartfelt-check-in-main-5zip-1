@@ -17,6 +17,7 @@ const Home = () => {
   const [showAddFactorModal, setShowAddFactorModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
+  const [refreshKey, setRefreshKey] = useState(0); // Force re-render when user changes
   const { factors, incrementFactor, decrementFactor, addFactor } = useTrackedFactors(selectedDate);
 
   // Get factors that are not yet being tracked
@@ -32,16 +33,19 @@ const Home = () => {
     });
   }, [moodHistory, selectedDate]);
 
-  // Refresh mood data when page gains focus or user ID changes
-  // This ensures moods are loaded AFTER user authentication is complete
+  // Refresh mood data and factors when page gains focus or user ID changes
+  // This ensures data is loaded AFTER user authentication is complete
   useEffect(() => {
     const handleFocus = () => {
       setMoodHistory(getMoodHistory());
+      setRefreshKey(prev => prev + 1); // Force factor reload
     };
     
     window.addEventListener("focus", handleFocus);
     // Load moods after user ID is available (when user is authenticated or anonymous)
     setMoodHistory(getMoodHistory());
+    // Force factor reload by incrementing key
+    setRefreshKey(prev => prev + 1);
     
     return () => window.removeEventListener("focus", handleFocus);
   }, [user]); // Re-run when user changes (after auth completes)
@@ -73,7 +77,7 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-screen gradient-bg pb-24">
+    <div className="min-h-screen gradient-bg pb-24" key={refreshKey}>
       <div className="max-w-md mx-auto px-5 pt-12 space-y-8">
         <DateIndicator 
           selectedDate={selectedDate} 

@@ -1,0 +1,136 @@
+❌ PROBLEM 2 — CLEAR NAME
+
+Tracked factor counts reset to zero after sign-out and sign-in.
+
+Observed behavior:
+
+You increase factor counts (e.g. Physical activity = 2, Mindfulness = 2).
+
+You sign out.
+
+You sign back into the same account.
+
+Factor counts reset to 0.
+
+Factors themselves still exist, but their daily values are lost.
+
+This confirms:
+
+❌ Factor values are not persisted per day
+
+✅ Factor definitions are persisted
+
+🧠 What is ACTUALLY wrong (root cause)
+
+This is not the same bug as the check-ins, but it’s related.
+
+What’s likely happening:
+
+Factors are stored as static definitions (name, icon, type)
+
+Factor counts are stored in temporary UI state
+
+On sign-in or reload:
+
+The app reloads factor definitions
+
+But does NOT reload factor values for the selected date
+
+So the UI defaults them to 0
+
+In short:
+
+You persist the factor list, but not the factor entries per day.
+
+✅ What the CORRECT behavior must be
+
+For each factor count:
+
+It must be stored per user + per date
+
+It must survive:
+
+Reload
+
+Navigation
+
+Sign-out
+
+Sign-in
+
+When the user returns to a date:
+
+The saved count must rehydrate into the UI
+
+This is the same pattern that daily check-ins should follow.
+
+✅ REQUIRED DATA MODEL (conceptual, simple)
+
+Each factor entry needs at least:
+
+userId (or anonymousId)
+
+date (YYYY-MM-DD)
+
+factorId
+
+count (number)
+
+Without this, persistence will always break.
+
+✅ STRONG REPLIT PROMPT (COPY–PASTE EXACTLY)
+
+Use this only for Problem 2:
+
+BUG FIX: Tracked factor counts reset after sign-out and sign-in.
+
+Observed behavior:
+- User increases factor counts for a given day (e.g. Physical activity = 2).
+- User signs out.
+- User signs back into the same account.
+- Factor counts reset to 0.
+- Factor definitions still exist.
+
+Conclusion:
+Factor values are not being persisted per user and per date.
+
+Required fix (do ALL of the following):
+
+1. Persist factor counts to permanent storage (not UI state).
+2. Store each factor entry with:
+   - userId (or anonymousId)
+   - date (YYYY-MM-DD)
+   - factorId
+   - count
+3. On app load AND on date change:
+   - Load saved factor counts for the current user and selected date.
+   - Populate the UI with the saved values instead of defaulting to 0.
+4. On sign-out:
+   - Do NOT clear persisted factor entries.
+5. Ensure factor persistence logic mirrors how tracked factor definitions are already stored.
+6. Do NOT reset factor counts unless:
+   - The user manually resets them
+   - The date changes to a day with no saved data
+7. Do NOT change UI, icons, or factor interaction behavior.
+
+Goal:
+Tracked factor counts must persist reliably across sign-out and sign-in, just like other user data.
+
+✅ HOW YOU VERIFY THIS FIX
+
+Test exactly this:
+
+Log in
+
+Set factor counts (e.g. 2, 2, 2)
+
+Reload page → counts stay
+
+Sign out
+
+Sign back in
+
+Go to same date
+
+✅ Counts must still be correct
+❌ If they reset → persistence is still broken
