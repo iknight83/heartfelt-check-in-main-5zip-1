@@ -20,6 +20,21 @@ const TRIAL_DURATION_DAYS = 7;
 const SUBSCRIPTION_KEY = "deeper_insights_subscribed";
 const TRIAL_STARTED_KEY = "trial_started_at";
 
+// Get user ID (includes anonymous session ID)
+const getUserId = (): string | null => {
+  try {
+    return localStorage.getItem("current_user_id");
+  } catch {
+    return null;
+  }
+};
+
+// Get storage key with user isolation
+const getUserStorageKey = (baseKey: string): string => {
+  const userId = getUserId();
+  return userId ? `${baseKey}__${userId}` : baseKey;
+};
+
 // Count unique days with check-ins (multiple check-ins on same day = 1 day)
 const getUniqueCheckInDays = (): number => {
   const moodHistory = getMoodHistory();
@@ -42,17 +57,20 @@ export const useSubscription = (): UseSubscriptionResult => {
 
   // Initialize from localStorage
   useEffect(() => {
-    const storedSubscription = localStorage.getItem(SUBSCRIPTION_KEY);
+    const subscriptionKey = getUserStorageKey(SUBSCRIPTION_KEY);
+    const trialStartKey = getUserStorageKey(TRIAL_STARTED_KEY);
+    
+    const storedSubscription = localStorage.getItem(subscriptionKey);
     if (storedSubscription === "true") {
       setIsSubscribed(true);
     }
 
     // Initialize trial start time for new users
-    let startTime = localStorage.getItem(TRIAL_STARTED_KEY);
+    let startTime = localStorage.getItem(trialStartKey);
     if (!startTime && !storedSubscription) {
       // First visit - set trial start time
       startTime = Date.now().toString();
-      localStorage.setItem(TRIAL_STARTED_KEY, startTime);
+      localStorage.setItem(trialStartKey, startTime);
     }
     if (startTime) {
       setTrialStartTime(parseInt(startTime));
@@ -115,7 +133,8 @@ export const useSubscription = (): UseSubscriptionResult => {
 
   const subscribe = () => {
     // Placeholder: In real implementation, this would trigger payment flow
-    localStorage.setItem(SUBSCRIPTION_KEY, "true");
+    const subscriptionKey = getUserStorageKey(SUBSCRIPTION_KEY);
+    localStorage.setItem(subscriptionKey, "true");
     setIsSubscribed(true);
   };
 

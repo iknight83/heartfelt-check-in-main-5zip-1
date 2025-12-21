@@ -1,0 +1,64 @@
+PROBLEM 4 (ANONYMOUS FLOW)
+CRITICAL BUG FIX: Anonymous onboarding state is not handled correctly.
+
+Observed behavior:
+- User chooses “Continue anonymously”.
+- User completes factor selection.
+- Reminder/alarm step works correctly.
+- At the paywall:
+  - Free trial option is missing.
+- After continuing:
+  - Selected tracking factors do not appear in the Journal.
+- This issue affects ONLY anonymous users.
+
+IMPORTANT CLARIFICATION (EXPECTED BEHAVIOR):
+- Anonymous users are local-only.
+- If an anonymous user signs out:
+  - ALL progress is intentionally lost.
+  - This includes:
+    - Daily check-ins
+    - Factor counts
+    - Selected tracking factors
+- This data loss is EXPECTED and CORRECT because the user chose anonymous mode.
+- This behavior must NOT apply to email-authenticated users.
+
+Required fix (do ALL of the following):
+
+1. Introduce a persistent anonymousId for the current anonymous session:
+   - Generated once per session
+   - Stored locally
+   - Used like a userId while the user remains anonymous
+2. During anonymous onboarding:
+   - Save selected tracking factors using anonymousId.
+3. On Journal load:
+   - Load tracking factors for anonymousId correctly.
+4. Update paywall logic:
+   - Anonymous users MUST see the same free trial options as other users.
+   - Free trial visibility must NOT depend on authentication status.
+5. Ensure anonymous onboarding data persists:
+   - Through onboarding steps
+   - Through the paywall
+   - Through navigation
+6. When an anonymous user signs out:
+   - Clear ALL anonymous data (this is correct and intended behavior).
+7. When an anonymous user later signs up with email:
+   - Treat them as a NEW user (no data migration required).
+8. Do NOT change UI, copy, pricing, or subscription options.
+9. Do NOT restrict anonymous users during onboarding beyond the intended data-loss warning.
+
+Goal:
+Anonymous users must complete onboarding correctly, see free trial options, and have their selected factors applied during the session — while still losing all data on sign-out, as explicitly intended.
+
+✅ Why this version is correct
+
+✔ Respects anonymous = local-only
+
+✔ Makes data loss intentional, not a bug
+
+✔ Fixes onboarding continuity within the session
+
+✔ Fixes missing free trial logic
+
+✔ Avoids accidental data migration
+
+✔ Prevents Replit from “saving too much”

@@ -34,21 +34,17 @@ args = "dev-server"
 name = "dev-server"
 author = "agent"
 
-[workflows.workflow.metadata]
-outputType = "console"
-
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "cd heartfelt-check-in-main && npm run dev"
-waitForPort = 5001
+waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [[ports]]
 localPort = 5000
-externalPort = 5000
-
-[[ports]]
-localPort = 5001
-externalPort = 3000
+externalPort = 80
 
 [[ports]]
 localPort = 8080

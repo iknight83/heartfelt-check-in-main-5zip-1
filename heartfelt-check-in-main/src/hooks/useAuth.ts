@@ -66,6 +66,11 @@ export const useAuth = () => {
   };
 
   const signInAnonymously = async () => {
+    // Generate a unique anonymous session ID
+    const anonymousId = `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    localStorage.setItem("anonymous_session_id", anonymousId);
+    localStorage.setItem("current_user_id", anonymousId);
+    
     const { error } = await supabase.auth.signInAnonymously();
     return { error };
   };
@@ -91,8 +96,20 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
+    // Check if this is an anonymous session
+    const isAnonymous = localStorage.getItem("anonymous_session_id");
+    
+    // For anonymous users: clear ALL data (intentional data loss)
+    if (isAnonymous) {
+      const anonymousId = localStorage.getItem("anonymous_session_id");
+      // Clear anonymous-specific data
+      localStorage.removeItem("tracked_factors__" + anonymousId);
+      localStorage.removeItem("daily_factor_counts__" + anonymousId);
+      localStorage.removeItem("mood_history__" + anonymousId);
+      localStorage.removeItem("anonymous_session_id");
+    }
+    
     // Clear onboarding state so user re-answers questions on next login
-    // BUT KEEP all account data (factors, check-ins, subscription) for when they sign back in
     localStorage.removeItem("termsAcceptedAt");
     
     const { error } = await supabase.auth.signOut();
