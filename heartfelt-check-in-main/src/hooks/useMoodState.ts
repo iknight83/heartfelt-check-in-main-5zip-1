@@ -102,6 +102,12 @@ export const saveMood = (updates: Partial<MoodEntry>) => {
 // Get mood history from localStorage
 export const getMoodHistory = (): MoodEntry[] => {
   try {
+    // Don't load if no user ID is set - prevents loading wrong data
+    const userId = getUserId();
+    if (!userId) {
+      return [];
+    }
+    
     const key = getUserStorageKey(MOOD_HISTORY_KEY);
     const stored = localStorage.getItem(key);
     if (stored) {

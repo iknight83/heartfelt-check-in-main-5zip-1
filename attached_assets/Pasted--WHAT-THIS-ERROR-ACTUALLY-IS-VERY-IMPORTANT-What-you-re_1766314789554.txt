@@ -1,0 +1,207 @@
+🧠 WHAT THIS “ERROR” ACTUALLY IS (VERY IMPORTANT)
+
+What you’re seeing is not a JavaScript error or a console failure.
+
+This line in your left panel is the key:
+
+“Fix onboarding flow by delaying terms acceptance timestamp”
+
+That means:
+
+The system previously marked onboarding as complete too early
+
+Specifically, termsAcceptedAt was being set before the paywall
+
+That caused:
+
+Factors not loading
+
+Free trial missing
+
+Anonymous state breaking
+
+New users being treated as “fully onboarded + Pro”
+
+So the fix applied was correct in principle.
+
+✅ WHAT IS NOW CORRECT (FROM YOUR SCREEN)
+
+From the checklist shown:
+
+User selects emotions → duration → support → factors
+✅ Factors save correctly
+✅ termsAcceptedAt is NOT set yet ← this is GOOD
+
+User reaches auth screen
+✅ Onboarding flag is NOT set ← GOOD
+
+User goes through reminder → paywall
+✅ Correct
+
+When paywall completes
+✅ termsAcceptedAt is set
+✅ handlePaywallContinue runs
+
+User navigates to home
+⚠️ This is where the remaining bug lives
+
+So the flow is 90% correct.
+
+❌ THE REAL PROBLEM THAT STILL EXISTS
+
+The remaining issue is NOT onboarding anymore.
+
+The real bug:
+
+State is being cleared or reinitialized when navigating to /home
+
+That’s why:
+
+Daily check-ins disappear
+
+Factor counts reset
+
+Anonymous selections vanish
+
+This happens because home is reloading from storage incorrectly.
+
+🔥 ROOT CAUSE (CLEAR AND PRECISE)
+
+One of these is happening (likely more than one):
+
+1️⃣ Daily check-ins are stored in memory only
+
+Factors are persisted
+
+Check-ins are not
+
+On reload / sign-out → lost
+
+2️⃣ Factor counts are reset on mount
+
+Component initializes counts to 0
+
+Does not rehydrate from storage
+
+3️⃣ Anonymous storage key mismatch
+
+Example:
+
+factors_userId
+checkins_anonymousId   ❌
+
+
+So data is saved, but never loaded.
+
+✅ THIS IS NOT A PAYMENT OR STRIPE ISSUE
+
+Stripe iframes in DevTools are normal:
+
+__privateStripeController
+
+
+Ignore those completely.
+
+✅ WHAT NEEDS TO BE FIXED NEXT (CLEAR TASK)
+The problem to fix now is:
+
+Hydration of local state on app load
+
+Specifically:
+
+Daily check-ins
+
+Factor counts
+
+Anonymous session data
+
+✅ VERY CLEAR REPLIT PROMPT FOR THIS ERROR
+
+Paste exactly this next:
+
+BUG FIX: Daily check-ins and factor counts are not rehydrating after navigation or sign-in.
+
+Observed behavior:
+- Factors list persists.
+- Factor counts reset to 0 after sign-out or reload.
+- Daily check-ins disappear after sign-out or reload.
+- This affects both anonymous users (during session) and authenticated users.
+- No runtime error is thrown.
+
+Root issue:
+- State is initialized but not rehydrated from persistent storage.
+
+Required fix:
+
+1. Ensure daily check-ins are persisted:
+   - Store check-ins in persistent storage (local storage or database).
+   - Use userId or anonymousId consistently.
+2. On app load (/home mount):
+   - Rehydrate daily check-ins from storage.
+   - Rehydrate factor counts from storage.
+3. Prevent default state reset:
+   - Do NOT initialize counts to 0 if stored data exists.
+4. Ensure anonymous data:
+   - Persists during session.
+   - Is cleared ONLY on sign-out.
+5. Ensure email-authenticated users:
+   - Load their persisted check-ins and factor counts correctly.
+
+Do NOT change:
+- UI
+- Onboarding flow
+- Paywall logic
+- Pricing or subscription behavior
+
+Goal:
+Daily check-ins and factor counts must survive reloads and navigation until the user explicitly signs out.
+
+🧪 HOW YOU TEST THIS FIX
+
+After Replit applies it:
+
+Test 1 — Email user
+
+Add daily check-in
+
+Add factor counts
+
+Sign out
+
+Sign in again
+
+✅ Everything is still there
+
+Test 2 — Anonymous user
+
+Continue anonymously
+
+Add daily check-in
+
+Add factor counts
+
+Navigate around
+
+✅ Data persists
+
+Sign out
+
+✅ Data is gone (EXPECTED)
+
+🟢 FINAL STATUS (HONEST)
+
+You are not broken.
+You are in final stabilization phase.
+
+This is normal when:
+
+Onboarding
+
+Anonymous mode
+
+Subscriptions
+
+Persistence
+all meet.
+
+You’re doing this correctly.

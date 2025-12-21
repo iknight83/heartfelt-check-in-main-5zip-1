@@ -12,12 +12,12 @@ import { useAuth } from "@/hooks/useAuth";
 type NavTab = "home" | "insights" | "you";
 
 const Home = () => {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [activeTab, setActiveTab] = useState<NavTab>("home");
   const [showAddFactorModal, setShowAddFactorModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
-  const [refreshKey, setRefreshKey] = useState(0); // Force re-render when user changes
+  const [isReady, setIsReady] = useState(false); // Track if data is ready to load
   const { factors, incrementFactor, decrementFactor, addFactor } = useTrackedFactors(selectedDate);
 
   // Get factors that are not yet being tracked
@@ -33,22 +33,46 @@ const Home = () => {
     });
   }, [moodHistory, selectedDate]);
 
-  // Refresh mood data and factors when page gains focus or user ID changes
-  // This ensures data is loaded AFTER user authentication is complete
+  // Wait for auth to complete and user ID to be available before loading data
+  useEffect(() => {
+    if (loading) return;
+    
+    // Poll for user ID availability
+    const checkAndLoad = () => {
+      const userId = localStorage.getItem("current_user_id");
+      if (userId) {
+        setMoodHistory(getMoodHistory());
+        setIsReady(true);
+        return true;
+      }
+      return false;
+    };
+    
+    // Try immediately
+    if (checkAndLoad()) return;
+    
+    // Poll until user ID is available (handles async auth)
+    const interval = setInterval(() => {
+      if (checkAndLoad()) {
+        clearInterval(interval);
+      }
+    }, 100);
+    
+    return () => clearInterval(interval);
+  }, [loading]);
+
+  // Refresh mood data when page gains focus
   useEffect(() => {
     const handleFocus = () => {
-      setMoodHistory(getMoodHistory());
-      setRefreshKey(prev => prev + 1); // Force factor reload
+      const userId = localStorage.getItem("current_user_id");
+      if (userId) {
+        setMoodHistory(getMoodHistory());
+      }
     };
     
     window.addEventListener("focus", handleFocus);
-    // Load moods after user ID is available (when user is authenticated or anonymous)
-    setMoodHistory(getMoodHistory());
-    // Force factor reload by incrementing key
-    setRefreshKey(prev => prev + 1);
-    
     return () => window.removeEventListener("focus", handleFocus);
-  }, [user]); // Re-run when user changes (after auth completes)
+  }, []);
 
   const handleAddFactor = () => {
     setShowAddFactorModal(true);
@@ -76,8 +100,17 @@ const Home = () => {
     setMoodHistory(getMoodHistory());
   };
 
+  // Show loading state until data is ready
+  if (loading || !isReady) {
+    return (
+      <div className="min-h-screen gradient-bg flex items-center justify-center">
+        <div className="text-soft animate-pulse">Loading...</div>
+      </div>
+    );
+  }
+
   return (
-    <div className="min-h-screen gradient-bg pb-24" key={refreshKey}>
+    <div className="min-h-screen gradient-bg pb-24">
       <div className="max-w-md mx-auto px-5 pt-12 space-y-8">
         <DateIndicator 
           selectedDate={selectedDate} 

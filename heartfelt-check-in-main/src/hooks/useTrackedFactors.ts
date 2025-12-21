@@ -49,6 +49,12 @@ const defaultFactors: TrackedFactor[] = [];
 // Get the base factors (without counts)
 export const getTrackedFactors = (): TrackedFactor[] => {
   try {
+    // Don't load if no user ID is set - prevents loading wrong data
+    const userId = getUserId();
+    if (!userId) {
+      return defaultFactors;
+    }
+    
     const key = getUserStorageKey(STORAGE_KEY);
     const stored = localStorage.getItem(key);
     if (stored) {
@@ -86,6 +92,12 @@ const saveDailyCounts = (counts: DailyFactorCounts) => {
 
 // Get factors with counts for a specific date
 export const getFactorsForDate = (date: Date): TrackedFactor[] => {
+  // Don't load if no user ID is set - prevents loading wrong data
+  const userId = getUserId();
+  if (!userId) {
+    return [];
+  }
+  
   const factors = getTrackedFactors();
   const dateKey = format(date, "yyyy-MM-dd");
   const dailyCounts = getDailyCounts();
@@ -139,22 +151,51 @@ export const initializeFactorsFromOnboarding = (
 };
 
 export const useTrackedFactors = (selectedDate: Date = new Date()) => {
-  const [factors, setFactors] = useState<TrackedFactor[]>(() => 
-    getFactorsForDate(selectedDate)
-  );
+  const [factors, setFactors] = useState<TrackedFactor[]>([]);
+  const [lastUserId, setLastUserId] = useState<string | null>(null);
 
-  // Update factors when date changes
+  // Update factors when date changes or user ID becomes available
   useEffect(() => {
-    setFactors(getFactorsForDate(selectedDate));
-  }, [selectedDate]);
-
-  useEffect(() => {
-    const handleFocus = () => {
+    const userId = getUserId();
+    
+    // If user ID changed or became available, reload factors
+    if (userId !== lastUserId) {
+      setLastUserId(userId);
+    }
+    
+    // Only load if we have a valid user ID
+    if (userId) {
       setFactors(getFactorsForDate(selectedDate));
+    }
+  }, [selectedDate, lastUserId]);
+
+  // Poll for user ID availability (handles async auth completion)
+  useEffect(() => {
+    const checkUserId = () => {
+      const userId = getUserId();
+      if (userId && userId !== lastUserId) {
+        setLastUserId(userId);
+        setFactors(getFactorsForDate(selectedDate));
+      }
+    };
+    
+    // Check immediately
+    checkUserId();
+    
+    // Also check on focus in case auth completed
+    const handleFocus = () => {
+      checkUserId();
     };
     window.addEventListener("focus", handleFocus);
-    return () => window.removeEventListener("focus", handleFocus);
-  }, [selectedDate]);
+    
+    // Poll periodically to catch auth completion
+    const interval = setInterval(checkUserId, 500);
+    
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      clearInterval(interval);
+    };
+  }, [selectedDate, lastUserId]);
 
   const incrementFactor = useCallback((id: string) => {
     const dateKey = format(selectedDate, "yyyy-MM-dd");

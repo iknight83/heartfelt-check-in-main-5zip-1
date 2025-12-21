@@ -2,6 +2,51 @@ import { useState, useEffect } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 
+// Migrate pending onboarding data to user-scoped keys
+const migratePendingDataToUser = (userId: string) => {
+  // Migrate tracked factors
+  const pendingFactors = localStorage.getItem("tracked_factors");
+  if (pendingFactors && !localStorage.getItem(`tracked_factors__${userId}`)) {
+    localStorage.setItem(`tracked_factors__${userId}`, pendingFactors);
+    localStorage.removeItem("tracked_factors");
+  }
+  
+  // Migrate daily factor counts
+  const pendingCounts = localStorage.getItem("daily_factor_counts");
+  if (pendingCounts && !localStorage.getItem(`daily_factor_counts__${userId}`)) {
+    localStorage.setItem(`daily_factor_counts__${userId}`, pendingCounts);
+    localStorage.removeItem("daily_factor_counts");
+  }
+  
+  // Migrate mood history
+  const pendingMoods = localStorage.getItem("mood_history");
+  if (pendingMoods && !localStorage.getItem(`mood_history__${userId}`)) {
+    localStorage.setItem(`mood_history__${userId}`, pendingMoods);
+    localStorage.removeItem("mood_history");
+  }
+  
+  // Migrate current mood
+  const pendingCurrentMood = localStorage.getItem("current_mood");
+  if (pendingCurrentMood && !localStorage.getItem(`current_mood__${userId}`)) {
+    localStorage.setItem(`current_mood__${userId}`, pendingCurrentMood);
+    localStorage.removeItem("current_mood");
+  }
+  
+  // Migrate termsAcceptedAt
+  const pendingTerms = localStorage.getItem("termsAcceptedAt");
+  if (pendingTerms && !localStorage.getItem(`termsAcceptedAt__${userId}`)) {
+    localStorage.setItem(`termsAcceptedAt__${userId}`, pendingTerms);
+    localStorage.removeItem("termsAcceptedAt");
+  }
+  
+  // Migrate trial started
+  const pendingTrial = localStorage.getItem("trial_started_at");
+  if (pendingTrial && !localStorage.getItem(`trial_started_at__${userId}`)) {
+    localStorage.setItem(`trial_started_at__${userId}`, pendingTrial);
+    localStorage.removeItem("trial_started_at");
+  }
+};
+
 export const useAuth = () => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
@@ -17,6 +62,8 @@ export const useAuth = () => {
         // Store user ID for data isolation
         if (session?.user?.id) {
           localStorage.setItem("current_user_id", session.user.id);
+          // Migrate any pending data from before auth
+          migratePendingDataToUser(session.user.id);
         } else {
           localStorage.removeItem("current_user_id");
         }
@@ -33,6 +80,8 @@ export const useAuth = () => {
       // Store user ID for data isolation
       if (session?.user?.id) {
         localStorage.setItem("current_user_id", session.user.id);
+        // Migrate any pending/legacy data to user-scoped keys
+        migratePendingDataToUser(session.user.id);
       } else {
         localStorage.removeItem("current_user_id");
       }
@@ -66,12 +115,20 @@ export const useAuth = () => {
   };
 
   const signInAnonymously = async () => {
-    // Generate a unique anonymous session ID
-    const anonymousId = `anon_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    localStorage.setItem("anonymous_session_id", anonymousId);
-    localStorage.setItem("current_user_id", anonymousId);
+    // Mark this as an anonymous session - the actual user ID will come from Supabase
+    localStorage.setItem("anonymous_session_id", "pending");
     
-    const { error } = await supabase.auth.signInAnonymously();
+    const { data, error } = await supabase.auth.signInAnonymously();
+    
+    // Once Supabase returns, update with the actual anonymous user ID
+    if (data?.user?.id) {
+      localStorage.setItem("anonymous_session_id", data.user.id);
+      localStorage.setItem("current_user_id", data.user.id);
+      
+      // Migrate any pending onboarding data to the user-scoped keys
+      migratePendingDataToUser(data.user.id);
+    }
+    
     return { error };
   };
 
@@ -96,21 +153,28 @@ export const useAuth = () => {
   };
 
   const signOut = async () => {
-    // Check if this is an anonymous session
+    // Get current user ID before clearing anything
+    const userId = localStorage.getItem("current_user_id");
     const isAnonymous = localStorage.getItem("anonymous_session_id");
     
     // For anonymous users: clear ALL data (intentional data loss)
-    if (isAnonymous) {
-      const anonymousId = localStorage.getItem("anonymous_session_id");
+    if (isAnonymous && userId) {
       // Clear anonymous-specific data
-      localStorage.removeItem("tracked_factors__" + anonymousId);
-      localStorage.removeItem("daily_factor_counts__" + anonymousId);
-      localStorage.removeItem("mood_history__" + anonymousId);
+      localStorage.removeItem("tracked_factors__" + userId);
+      localStorage.removeItem("daily_factor_counts__" + userId);
+      localStorage.removeItem("mood_history__" + userId);
+      localStorage.removeItem("current_mood__" + userId);
+      localStorage.removeItem("termsAcceptedAt__" + userId);
+      localStorage.removeItem("trial_started_at__" + userId);
+      localStorage.removeItem("deeper_insights_subscribed__" + userId);
       localStorage.removeItem("anonymous_session_id");
+      // Also clear global keys if they exist
+      localStorage.removeItem("termsAcceptedAt");
     }
     
-    // Clear onboarding state so user re-answers questions on next login
-    localStorage.removeItem("termsAcceptedAt");
+    // For email users: KEEP their termsAcceptedAt so they skip onboarding on return
+    // Also KEEP their factor/mood data - only clear the session-related state
+    // DON'T clear termsAcceptedAt for email users!
     
     const { error } = await supabase.auth.signOut();
     

@@ -37,19 +37,32 @@ const Index = () => {
   });
 
   // Check if user has already completed onboarding
+  // Only run once after auth loading completes to avoid race conditions
   useEffect(() => {
     if (loading) return;
     
-    const hasCompletedOnboarding = localStorage.getItem("termsAcceptedAt");
-    if (hasCompletedOnboarding) {
-      // User already completed onboarding - go directly to home
-      navigate("/home", { replace: true });
-      return;
-    }
+    // Wait a tick for localStorage to be updated after auth
+    const timeoutId = setTimeout(() => {
+      const userId = localStorage.getItem("current_user_id");
+      
+      // Check user-specific key first, then fallback to legacy global key
+      let hasCompletedOnboarding = false;
+      if (userId) {
+        hasCompletedOnboarding = !!localStorage.getItem(`termsAcceptedAt__${userId}`);
+      }
+      // Also check legacy global key for backwards compatibility
+      if (!hasCompletedOnboarding) {
+        hasCompletedOnboarding = !!localStorage.getItem("termsAcceptedAt");
+      }
+      
+      if (hasCompletedOnboarding && userId) {
+        // User already completed onboarding - go directly to home
+        navigate("/home", { replace: true });
+      }
+    }, 100); // Small delay to ensure localStorage is updated
     
-    // If we reach here, user hasn't completed onboarding yet
-    // They should start from the beginning (emotions)
-  }, [navigate, loading]);
+    return () => clearTimeout(timeoutId);
+  }, [navigate, loading]); // Only depend on loading, not user
 
   const handleEmotionsContinue = (emotions: string[]) => {
     setSelections((prev) => ({ ...prev, emotions, skippedEmotions: false }));
@@ -74,8 +87,10 @@ const Index = () => {
   const handleAuthContinue = (method: "google" | "apple" | "anonymous" | "email") => {
     setSelections((prev) => ({ ...prev, authMethod: method }));
     
-    // Check if user already completed onboarding before (termsAcceptedAt is set)
-    const hasCompletedOnboarding = localStorage.getItem("termsAcceptedAt");
+    // Check if user already completed onboarding before (using user-isolated key)
+    const userId = localStorage.getItem("current_user_id");
+    const onboardingKey = userId ? `termsAcceptedAt__${userId}` : "termsAcceptedAt";
+    const hasCompletedOnboarding = localStorage.getItem(onboardingKey);
     
     // If user is authenticated with email AND already completed onboarding, they're returning - go to home
     // Otherwise, continue with onboarding (new users need to answer questions again)
@@ -107,8 +122,10 @@ const Index = () => {
 
   const handlePaywallContinue = (plan: "lifetime" | "annual" | "monthly") => {
     setSelections((prev) => ({ ...prev, selectedPlan: plan }));
-    // Mark onboarding as completed BEFORE navigating to home
-    localStorage.setItem("termsAcceptedAt", new Date().toISOString());
+    // Mark onboarding as completed with user-isolated key BEFORE navigating to home
+    const userId = localStorage.getItem("current_user_id");
+    const onboardingKey = userId ? `termsAcceptedAt__${userId}` : "termsAcceptedAt";
+    localStorage.setItem(onboardingKey, new Date().toISOString());
     navigate("/home", { replace: true });
   };
 

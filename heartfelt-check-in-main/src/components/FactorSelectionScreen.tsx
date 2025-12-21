@@ -55,7 +55,10 @@ const FactorSelectionScreen = ({ onContinue, onBack }: FactorSelectionScreenProp
   const handleContinue = () => {
     // Only save factors if this is a NEW user (no termsAcceptedAt yet)
     // Returning users keep their existing factors from before sign-out
-    const isNewUser = !localStorage.getItem("termsAcceptedAt");
+    const userId = localStorage.getItem("current_user_id");
+    const onboardingKey = userId ? `termsAcceptedAt__${userId}` : "termsAcceptedAt";
+    const isNewUser = !localStorage.getItem(onboardingKey);
+    
     if (isNewUser) {
       // Only save for brand new users
       initializeFactorsFromOnboarding(selectedFactors, allFactors);
