@@ -28,7 +28,6 @@ const JourneyAuthScreen = ({ onContinue, onRegister, onBack }: JourneyAuthScreen
     }
     
     setIsLoading("anonymous");
-    localStorage.setItem("termsAcceptedAt", new Date().toISOString());
     
     const { error } = await signInAnonymously();
     if (error) {
@@ -44,7 +43,6 @@ const JourneyAuthScreen = ({ onContinue, onRegister, onBack }: JourneyAuthScreen
       setShowError(true);
       return;
     }
-    localStorage.setItem("termsAcceptedAt", new Date().toISOString());
     setAuthMode("email-signin");
   };
 
@@ -53,7 +51,6 @@ const JourneyAuthScreen = ({ onContinue, onRegister, onBack }: JourneyAuthScreen
       setShowError(true);
       return;
     }
-    localStorage.setItem("termsAcceptedAt", new Date().toISOString());
     setAuthMode("email-signup");
   };
 
