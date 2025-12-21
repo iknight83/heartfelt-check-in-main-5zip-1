@@ -1,0 +1,161 @@
+❌ PROBLEM 3 — CLEAR NAME
+
+New users are incorrectly treated as Pro users and skip onboarding.
+
+Observed behavior:
+
+A brand-new user signs up
+
+They are:
+
+Immediately redirected to the Journal page
+
+Incorrectly marked as Pro
+
+The onboarding flow is skipped entirely
+
+Subscription / free trial screen is never shown
+
+❗ This happens ONLY for new users
+Returning users should NOT be affected.
+
+🧠 What is ACTUALLY wrong (root cause)
+
+One or more of these is happening:
+
+The app does not distinguish new users vs returning users
+
+A default isPro = true or subscriptionStatus = active is being set
+
+On first login, the app:
+
+Skips onboarding checks
+
+Routes directly to /home or /journal
+
+There is no onboarding completion flag
+
+Subscription logic is evaluated before onboarding is finished
+
+In short:
+
+User lifecycle state is missing or ignored.
+
+✅ WHAT THE CORRECT BEHAVIOR MUST BE
+For NEW USERS ONLY:
+
+After successful registration:
+
+User must enter onboarding flow
+
+Onboarding order:
+
+Intro / welcome (if exists)
+
+Preferences / explanation (if exists)
+
+Subscription screen (free trial + paid options)
+
+Completion step
+
+Only after onboarding is finished:
+
+User is routed to Journal
+
+New users must:
+
+Start as Free
+
+Never be marked as Pro automatically
+
+For EXISTING USERS:
+
+Skip onboarding
+
+Route normally to Journal
+
+Respect actual subscription status
+
+✅ REQUIRED USER STATE (simple but mandatory)
+
+You need at least one of these flags:
+
+isNewUser
+
+hasCompletedOnboarding
+
+onboardingStep
+
+Without this, this bug will keep coming back.
+
+🚨 WHY THIS IS A BIG DEAL (you’re right)
+
+This bug:
+
+❌ Breaks monetization
+
+❌ Breaks trust
+
+❌ Gives away Pro for free
+
+❌ Makes onboarding meaningless
+
+Fixing this is mandatory before launch.
+
+✅ STRONG REPLIT PROMPT (COPY–PASTE EXACTLY)
+
+Use this only for Problem 3:
+
+CRITICAL BUG FIX: New users are skipping onboarding and being incorrectly marked as Pro.
+
+Observed behavior:
+- Brand-new users are redirected directly to the Journal page.
+- New users are incorrectly given Pro access.
+- Onboarding and subscription selection are skipped.
+- This issue affects ONLY new users.
+
+Required behavior:
+
+1. Detect new users reliably on first sign-up.
+2. Introduce and persist a user lifecycle flag:
+   - hasCompletedOnboarding = false (default for new users)
+3. After registration:
+   - Route new users through the onboarding flow.
+4. During onboarding:
+   - Present the subscription screen (free trial + paid options).
+5. Do NOT assign Pro access unless:
+   - User explicitly selects a plan
+   - Or starts a free trial intentionally
+6. Only after onboarding is completed:
+   - Set hasCompletedOnboarding = true
+   - Route the user to the Journal page
+7. Existing users:
+   - Must skip onboarding
+   - Must retain correct subscription status
+8. Do NOT change UI design or copy.
+9. Do NOT affect login flow for existing users.
+
+Goal:
+New users must complete onboarding and subscription selection before accessing the Journal, and must never receive Pro access automatically.
+
+✅ HOW YOU VERIFY THIS FIX (IMPORTANT)
+
+Test exactly this:
+
+Test A — New user
+
+Register with a new email
+
+Observe route
+
+✅ Goes to onboarding
+✅ Sees subscription screen
+✅ No Pro access until chosen
+✅ Journal only after onboarding
+
+Test B — Existing user
+
+Log in with existing account
+
+✅ Goes straight to Journal
+✅ Subscription status unchanged

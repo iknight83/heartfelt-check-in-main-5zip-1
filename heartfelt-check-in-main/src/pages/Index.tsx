@@ -36,21 +36,20 @@ const Index = () => {
     selectedPlan: null,
   });
 
-  // Check if user has already completed onboarding or is authenticated
+  // Check if user has already completed onboarding
   useEffect(() => {
     if (loading) return;
     
-    const hasCompletedOnboarding = localStorage.getItem("termsAcceptedAt") && localStorage.getItem("tracked_factors");
+    const hasCompletedOnboarding = localStorage.getItem("termsAcceptedAt");
     if (hasCompletedOnboarding) {
+      // User already completed onboarding - go directly to home
       navigate("/home", { replace: true });
       return;
     }
     
-    // If user is authenticated but hasn't completed onboarding, skip to reminder step
-    if (user && localStorage.getItem("termsAcceptedAt")) {
-      setStep("reminder");
-    }
-  }, [navigate, user, loading]);
+    // If we reach here, user hasn't completed onboarding yet
+    // They should start from the beginning (emotions)
+  }, [navigate, loading]);
 
   const handleEmotionsContinue = (emotions: string[]) => {
     setSelections((prev) => ({ ...prev, emotions, skippedEmotions: false }));
@@ -108,7 +107,9 @@ const Index = () => {
 
   const handlePaywallContinue = (plan: "lifetime" | "annual" | "monthly") => {
     setSelections((prev) => ({ ...prev, selectedPlan: plan }));
-    navigate("/home");
+    // Mark onboarding as completed BEFORE navigating to home
+    localStorage.setItem("termsAcceptedAt", new Date().toISOString());
+    navigate("/home", { replace: true });
   };
 
   const handleRestorePurchases = () => {
