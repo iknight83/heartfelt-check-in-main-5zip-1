@@ -85,5 +85,5 @@ externalPort = 80
 
 [deployment]
 deploymentTarget = "autoscale"
-run = ["bash", "-c", "cd heartfelt-check-in-main && npm run start"]
-build = ["bash", "-c", "cd heartfelt-check-in-main && npm run build"]
+run = ["sh", "-c", "npm run start"]
+build = ["sh", "-c", "npm run build"]
