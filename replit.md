@@ -68,6 +68,20 @@ The app uses Ozow for South African payment processing with a secure server-side
    - `OZOW_API_KEY`: API key for authentication
    - `OZOW_PRIVATE_KEY`: Private key for hash verification
 
+5. **API Endpoints**:
+   - `POST /api/ozow/initiate` - Creates payment and returns Ozow form data
+   - `POST /api/ozow/notify` - Receives Ozow callbacks (hash-verified)
+   - `POST /api/ozow/confirm-payment` - Frontend polls for payment status
+   - `GET /api/ozow/subscription/:userId` - Check user's active subscription
+   - `GET /api/ozow/verify/:transactionReference` - Verify payment status
+
+6. **Testing Ozow Payments**:
+   - Enable test mode: `IsTest: true` in payment data (automatic in dev)
+   - Use Ozow test credentials from your Ozow dashboard
+   - Test flow: Paywall → Select plan → Ozow checkout → Success/Cancel/Error page
+   - Verify subscription activated: Check `subscriptions` table in database
+   - Test restore: Click "Restore purchases" on paywall to sync from server
+
 ### Data Persistence Implementation (Fixed Dec 2025)
 The app now uses a robust data migration pattern:
 

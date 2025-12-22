@@ -65,18 +65,32 @@ const Paywall = () => {
     }
   };
 
-  const handleRestore = () => {
+  const handleRestore = async () => {
     const userId = localStorage.getItem("current_user_id");
-    if (userId) {
-      const isSubscribed = localStorage.getItem(`deeper_insights_subscribed__${userId}`);
-      if (isSubscribed === "true") {
+    if (!userId) {
+      toast.error("Please sign in to restore purchases");
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      const response = await fetch(`/api/ozow/subscription/${userId}`);
+      const data = await response.json();
+
+      if (data.hasSubscription) {
+        localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
+        localStorage.setItem(`subscription_plan__${userId}`, data.plan);
+        localStorage.setItem(`subscription_activated_at__${userId}`, data.activatedAt);
         toast.success("Your subscription has been restored!");
         navigate("/insights");
       } else {
         toast.info("No previous subscription found");
       }
-    } else {
-      toast.error("Please sign in to restore purchases");
+    } catch (error) {
+      console.error("Restore subscription error:", error);
+      toast.error("Failed to restore subscription. Please try again.");
+    } finally {
+      setIsProcessing(false);
     }
   };
 

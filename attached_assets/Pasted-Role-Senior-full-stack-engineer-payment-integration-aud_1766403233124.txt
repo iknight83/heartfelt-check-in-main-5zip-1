@@ -1,0 +1,165 @@
+Role: Senior full-stack engineer & payment-integration auditor
+Goal: Ensure all subscription plans correctly initiate Ozow payments and complete the full payment → subscription activation flow
+
+🔧 TASK OBJECTIVE
+
+Audit and fix the Ozow subscription payment flow so that every subscription option (Monthly / Annual / Lifetime):
+
+Redirects the user to Ozow checkout
+
+Supports Visa, Mastercard, Instant EFT, Bank Apps, Google Pay (if enabled by Ozow)
+
+Activates the subscription only after confirmed payment
+
+Is secure, server-validated, and production-ready
+
+🔍 REQUIRED CHECKS & FIXES
+1️⃣ Frontend (Paywall / Subscribe button)
+
+Ensure Subscribe Now:
+
+Calls a backend endpoint (NOT Ozow directly)
+
+Sends only:
+
+userId
+
+planId (monthly | annual | lifetime)
+
+Prevent price manipulation from frontend
+
+2️⃣ Backend (Ozow integration)
+
+Verify /api/ozow/create-payment exists and:
+
+Generates server-side transaction reference
+
+Uses server-side pricing
+
+Builds Ozow hash correctly using:
+
+OZOW_SITE_CODE
+
+OZOW_PRIVATE_KEY
+
+OZOW_API_KEY
+
+Redirect user to Ozow payment URL
+
+3️⃣ Ozow Callbacks
+
+Ensure all callbacks exist and work:
+
+/api/ozow/callback (payment notification)
+
+/api/ozow/success
+
+/api/ozow/cancel
+
+/api/ozow/error
+
+Callback must:
+
+Verify Ozow hash/signature
+
+Reject invalid or unknown transactions
+
+Update payment status only after verification
+
+4️⃣ Database (Supabase)
+
+Ensure tables exist and are used:
+
+payments
+
+id
+
+reference
+
+user_id
+
+plan
+
+amount
+
+status
+
+created_at
+
+subscriptions
+
+user_id
+
+plan
+
+status
+
+start_date
+
+payment_id
+
+Activate subscription only after successful payment
+
+5️⃣ Vite / Dev Proxy
+
+Ensure frontend can call backend:
+
+Vite proxy forwards /api/* → localhost:4000
+
+🔐 ENVIRONMENT VARIABLES (MUST BE USED)
+
+Use existing env vars (do NOT hardcode):
+
+OZOW_SITE_CODE
+OZOW_PRIVATE_KEY
+OZOW_API_KEY
+OZOW_BASE_URL
+
+
+Frontend must only access VITE_* variables.
+
+🧪 TESTING REQUIREMENTS
+
+After implementation:
+
+Clicking Subscribe Now must:
+
+Redirect to Ozow
+
+Show payment methods
+
+After successful payment:
+
+Subscription becomes active
+
+User is redirected to success screen
+
+Failed/cancelled payments must NOT activate subscription
+
+📌 FINAL OUTPUT REQUIRED
+
+Fix or add missing code (frontend + backend)
+
+Ensure security best practices
+
+Log meaningful errors
+
+Update replit.md with:
+
+How subscriptions work
+
+How to test Ozow payments
+
+Confirm everything is wired correctly
+
+🚨 IMPORTANT CONSTRAINTS
+
+❌ No localStorage-only subscriptions
+
+❌ No client-side pricing
+
+❌ No skipping payment verification
+
+✅ Server controls everything
+
+Begin by auditing the current codebase and implement only what is missing or incorrect. Fix issues automatically where possible.
