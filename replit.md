@@ -35,9 +35,38 @@ Preferred communication style: Simple, everyday language.
 - **DailyFactorCounts**: Nested object keyed by date and factor ID for tracking factor values per day
 
 ### Subscription System
-- **Trial Period**: 7-day free trial based on unique days with check-ins
-- **Plans**: Monthly, annual, and lifetime subscription tiers (payment integration is placeholder)
+- **Trial Period**: 7-day free trial from first visit
+- **Plans**: Monthly (R49), Annual (R349), Lifetime (R999) subscription tiers
+- **Payment Provider**: Ozow (South African payment gateway)
 - **Feature Gating**: Confidence levels for insights are restricted based on subscription status
+
+### Ozow Payment Integration (Dec 2025)
+The app uses Ozow for South African payment processing with a secure server-side implementation:
+
+1. **Security Model**:
+   - Server generates all transaction references (no client-supplied identifiers)
+   - Server controls pricing via PLAN_PRICES constant
+   - Mandatory SHA512 hash verification on all Ozow callbacks
+   - Rejects callbacks without valid signatures (403 response)
+   - Rejects callbacks for unknown transactions (404 response)
+
+2. **Database Tables** (PostgreSQL):
+   - `payments`: transaction_reference (unique), user_id, plan, amount, status, ozow_transaction_id, verified_at
+   - `subscriptions`: user_id (unique), plan, is_active, activated_at, payment_id
+
+3. **Payment Flow**:
+   - Client calls `/api/ozow/initiate` with userId and plan only
+   - Server creates payment record with server-generated reference and pricing
+   - Client redirects to Ozow via form POST
+   - Ozow calls `/api/ozow/notify` with signed callback
+   - Server verifies hash BEFORE any state changes
+   - Server updates payment status and activates subscription
+   - Client polls `/api/ozow/confirm-payment` with retry logic
+
+4. **Environment Variables Required**:
+   - `OZOW_SITE_CODE`: Merchant site code
+   - `OZOW_API_KEY`: API key for authentication
+   - `OZOW_PRIVATE_KEY`: Private key for hash verification
 
 ### Data Persistence Implementation (Fixed Dec 2025)
 The app now uses a robust data migration pattern:
