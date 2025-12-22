@@ -112,6 +112,6 @@ localPort = 8080
 externalPort = 80
 
 [deployment]
-deploymentTarget = "autoscale"
-run = ["sh", "-c", "npm run start"]
+deploymentTarget = "static"
 build = ["sh", "-c", "npm run build"]
+publicDir = "heartfelt-check-in-main/dist"
