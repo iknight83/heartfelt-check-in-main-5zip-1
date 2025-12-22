@@ -13,11 +13,13 @@ interface UseSubscriptionResult {
   trialStartDate: Date | null;
   maxAllowedConfidence: 'Exploratory' | 'Emerging' | 'Moderate' | 'Strong';
   canGenerateNewPatterns: boolean;
-  subscribe: () => void; // Placeholder for payment flow
+  subscribe: (plan?: "monthly" | "annual" | "lifetime") => void;
 }
 
 const TRIAL_DURATION_DAYS = 7;
 const SUBSCRIPTION_KEY = "deeper_insights_subscribed";
+const SUBSCRIPTION_PLAN_KEY = "subscription_plan";
+const SUBSCRIPTION_ACTIVATED_KEY = "subscription_activated_at";
 const TRIAL_STARTED_KEY = "trial_started_at";
 
 // Get user ID (includes anonymous session ID)
@@ -131,10 +133,16 @@ export const useSubscription = (): UseSubscriptionResult => {
     };
   }, [isSubscribed, trialStartTime]);
 
-  const subscribe = () => {
-    // Placeholder: In real implementation, this would trigger payment flow
+  const subscribe = (plan?: "monthly" | "annual" | "lifetime") => {
     const subscriptionKey = getUserStorageKey(SUBSCRIPTION_KEY);
+    const planKey = getUserStorageKey(SUBSCRIPTION_PLAN_KEY);
+    const activatedKey = getUserStorageKey(SUBSCRIPTION_ACTIVATED_KEY);
+    
     localStorage.setItem(subscriptionKey, "true");
+    if (plan) {
+      localStorage.setItem(planKey, plan);
+    }
+    localStorage.setItem(activatedKey, new Date().toISOString());
     setIsSubscribed(true);
   };
 
