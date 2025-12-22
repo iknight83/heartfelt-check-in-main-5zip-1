@@ -1,0 +1,158 @@
+🔧 SYSTEM TASK: OZOW PAYMENT & SUBSCRIPTION CONNECTION AUDIT
+
+You are acting as a senior full-stack engineer.
+
+This project is a Vite + React + Supabase + Express backend app running on Replit.
+
+The app uses Ozow for payments and Supabase for authentication and subscriptions.
+
+🎯 GOAL
+
+Verify that all payment and subscription flows are correctly connected, and fix them if not, without changing UI design.
+
+🔍 SCOPE OF WORK
+1️⃣ Environment & Secrets Validation
+
+Verify .env variables are loaded correctly in:
+
+frontend (VITE_*)
+
+backend (process.env)
+
+Do NOT hardcode secrets
+
+Fail gracefully if env vars are missing
+
+2️⃣ Ozow Integration Audit
+
+Confirm that:
+
+Payment request is correctly built
+
+Correct Ozow endpoint is used
+
+Browser redirect to Ozow happens on Subscribe Now
+
+Required Ozow fields are included:
+
+SiteCode
+
+PrivateKey
+
+ApiKey
+
+Amount
+
+TransactionReference
+
+SuccessUrl
+
+CancelUrl
+
+ErrorUrl
+
+HashCheck
+
+If any part is missing or incorrect:
+➡️ Fix it using best-practice Ozow integration logic.
+
+3️⃣ Redirect & Return Flow
+
+Ensure:
+
+User is redirected to Ozow checkout page
+
+After payment:
+
+Success → /payment/success
+
+Cancel → /payment/cancel
+
+Error → /payment/error
+
+Ensure frontend routes exist and render safely.
+
+4️⃣ Payment Verification (Backend)
+
+Ensure backend:
+
+Verifies Ozow response securely
+
+Confirms payment status before unlocking subscription
+
+Prevents fake redirects from activating Pro
+
+If missing:
+➡️ Add minimal secure verification logic.
+
+5️⃣ Subscription Activation
+
+Ensure:
+
+Successful payment updates Supabase:
+
+is_pro = true
+
+plan = monthly | annual | lifetime
+
+activated_at
+
+Subscription persists after refresh
+
+Non-paid users cannot access Pro features
+
+Fix logic if broken.
+
+6️⃣ Idempotency & Safety
+
+Ensure:
+
+Duplicate callbacks don’t double-activate subscription
+
+Payment verification is server-side only
+
+Frontend never trusts payment success alone
+
+🚫 DO NOT
+
+Do NOT redesign UI
+
+Do NOT change pricing
+
+Do NOT remove Ozow
+
+Do NOT expose secrets
+
+Do NOT add new payment providers
+
+✅ OUTPUT EXPECTATION
+
+At the end:
+
+Ozow redirect works
+
+Payment returns correctly
+
+Subscription unlocks only after payment
+
+All flows lead to correct screens
+
+App is production-ready for Ozow
+
+If something is broken:
+➡️ Fix it automatically.
+
+If something is missing:
+➡️ Add the minimal required code.
+
+🧠 THINK FIRST, THEN CODE
+
+Before changing anything:
+
+Read existing code
+
+Identify gaps
+
+Apply smallest possible fix
+
+END TASK
