@@ -1,0 +1,121 @@
+✅ What you WANT (confirmed)
+
+You want this behaviour:
+
+Plan	User type	What should happen
+Free Trial	Anonymous	Enter app
+Monthly / Annual / Lifetime	Anonymous	✅ Redirect to Ozow
+Monthly / Annual / Lifetime	Signed-in	✅ Redirect to Ozow
+
+So anonymous users CAN pay. Good — totally valid.
+
+🚨 Why it’s currently wrong (root cause)
+
+Right now your app logic is effectively doing this:
+
+IF user is anonymous
+   → allow access immediately
+
+
+This rule is too broad and fires before the payment logic.
+
+So even when:
+
+Annual is selected ✅
+
+User is anonymous ✅
+
+The app exits early and sends them to the Journal.
+
+That’s why Ozow never opens.
+
+✅ The CORRECT logic (this is the real fix)
+
+Anonymous users must NOT automatically enter the app.
+
+Instead, the logic must be plan-first, not user-first.
+
+✅ Correct decision order (this is key)
+IF plan === "free_trial"
+   → allow access (anonymous or signed-in)
+
+ELSE
+   → redirect to Ozow (anonymous OR signed-in)
+
+
+That’s it.
+No anonymous check needed before payment.
+
+🔐 What changes AFTER payment (important)
+
+Because anonymous users can’t be permanently identified, you need one extra step after Ozow:
+
+After successful payment:
+
+User is returned to your app
+
+App says:
+
+“Payment successful. Please create an account to activate your subscription.”
+
+This is standard practice and totally fine.
+
+Payment ≠ account
+Account is created after payment.
+
+🧩 Correct full flow (simple English)
+
+1️⃣ User selects Annual
+2️⃣ Clicks Continue
+3️⃣ App redirects to Ozow
+4️⃣ User pays
+5️⃣ Ozow redirects back (success)
+6️⃣ App stores payment temporarily
+7️⃣ App asks user to:
+
+Sign up or
+
+Log in
+8️⃣ Subscription is attached to that account
+
+🟢 What to tell Replit AI (EXACT prompt)
+
+Copy–paste this exactly:
+
+Fix the subscription flow logic.
+
+Requirements:
+- Anonymous users MUST be allowed to pay for Monthly, Annual, and Lifetime plans.
+- Do NOT block anonymous users before payment.
+
+Correct logic:
+1. If plan === "free_trial":
+   - Allow access immediately (anonymous or signed-in)
+
+2. If plan !== "free_trial":
+   - Redirect user to Ozow payment page
+   - This applies to BOTH anonymous and signed-in users
+
+After payment success:
+- If user is anonymous:
+  - Prompt user to create an account or sign in to activate the subscription
+- If user is signed in:
+  - Activate subscription immediately
+
+Do NOT change Ozow integration.
+Only fix conditional logic and post-payment handling.
+Add clear comments.
+
+🧠 Why this is the BEST approach
+
+✅ No payment friction
+
+✅ Anonymous users can pay immediately
+
+✅ You stay secure
+
+✅ You don’t lose conversions
+
+✅ Industry-standard flow
+
+This is how many SaaS apps actually do it.
