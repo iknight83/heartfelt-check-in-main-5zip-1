@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, User, Crown, Clock, Settings, Bell, Shield, Sparkles, Database, BarChart3, ChevronRight, HelpCircle, FileText, Scale, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -70,14 +70,87 @@ const getMoodColor = (average: number, hasData: boolean): string => {
 const Profile = () => {
   const navigate = useNavigate();
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("lifetime");
-  const { isSubscribed, isTrialActive, trialDaysUsed, subscribe } = useSubscription();
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
+  const [serverSubscribed, setServerSubscribed] = useState(false);
+  const { isSubscribed: localSubscribed, isTrialActive, trialDaysUsed, subscribe } = useSubscription();
   const profileSummary = useProfileSummary();
   const { moodEntries } = useMoodData();
   const { signOut, user } = useAuth();
 
+  const isSubscribed = localSubscribed || serverSubscribed;
+
+  useEffect(() => {
+    const checkServerSubscription = async () => {
+      const userId = localStorage.getItem("current_user_id");
+      if (!userId) return;
+
+      try {
+        const response = await fetch(`/api/ozow/subscription/${userId}`);
+        const data = await response.json();
+        
+        if (data.hasSubscription) {
+          setServerSubscribed(true);
+          localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
+          localStorage.setItem(`subscription_plan__${userId}`, data.plan);
+        }
+      } catch (error) {
+        console.error("Failed to check subscription status:", error);
+      }
+    };
+
+    checkServerSubscription();
+  }, []);
+
+  const initiateOzowPayment = async (plan: PlanType) => {
+    try {
+      setIsProcessingPayment(true);
+      
+      let userId = localStorage.getItem("current_user_id");
+      if (!userId) {
+        userId = `anon_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
+        localStorage.setItem("current_user_id", userId);
+        localStorage.setItem("is_anonymous_payment", "true");
+      }
+
+      const response = await fetch("/api/ozow/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId, plan }),
+      });
+
+      const data = await response.json();
+
+      if (data.status === "ok" && data.paymentUrl && data.paymentData) {
+        localStorage.setItem("pending_payment_plan", plan);
+        localStorage.setItem("pending_transaction_ref", data.paymentData.TransactionReference);
+        
+        const form = document.createElement("form");
+        form.method = "POST";
+        form.action = data.paymentUrl;
+        form.style.display = "none";
+
+        Object.entries(data.paymentData).forEach(([key, value]) => {
+          const input = document.createElement("input");
+          input.type = "hidden";
+          input.name = key;
+          input.value = String(value);
+          form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+      } else {
+        throw new Error(data.message || "Failed to initiate payment");
+      }
+    } catch (error) {
+      console.error("Payment initiation error:", error);
+      toast.error("Failed to start payment. Please try again.");
+      setIsProcessingPayment(false);
+    }
+  };
+
   const handleSubscribe = () => {
-    subscribe();
-    navigate("/insights");
+    initiateOzowPayment(selectedPlan);
   };
 
   const handleSignOut = async () => {
@@ -135,6 +208,15 @@ const Profile = () => {
       emotionalRange,
     };
   }, [moodEntries]);
+
+  if (isProcessingPayment) {
+    return (
+      <div className="min-h-screen gradient-bg flex flex-col items-center justify-center px-6">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+        <p className="text-foreground text-lg">Redirecting to payment...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen gradient-bg pb-24">
