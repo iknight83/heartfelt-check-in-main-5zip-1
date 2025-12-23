@@ -112,6 +112,7 @@ localPort = 8080
 externalPort = 80
 
 [deployment]
-deploymentTarget = "static"
-build = ["sh", "-c", "npm run build"]
+deploymentTarget = "autoscale"
+build = ["bash", "-c", "cd heartfelt-check-in-main && npm run build"]
 publicDir = "heartfelt-check-in-main/dist"
+run = ["bash", "-c", "cd heartfelt-check-in-main && npm run start"]
