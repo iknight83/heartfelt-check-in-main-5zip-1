@@ -96,8 +96,19 @@ const verifyOzowNotificationHash = (params: {
 };
 
 router.post("/initiate", async (req, res) => {
+  console.log("=== OZOW INITIATE ENDPOINT HIT ===");
+  console.log("Request body:", JSON.stringify(req.body, null, 2));
+  console.log("OZOW_SITE_CODE configured:", !!OZOW_SITE_CODE);
+  console.log("OZOW_PRIVATE_KEY configured:", !!OZOW_PRIVATE_KEY);
+  console.log("OZOW_API_KEY configured:", !!OZOW_API_KEY);
+  console.log("IS_TEST mode:", IS_TEST);
+  console.log("REPLIT_DEV_DOMAIN:", process.env.REPLIT_DEV_DOMAIN);
+  
   try {
     if (!OZOW_SITE_CODE || !OZOW_PRIVATE_KEY) {
+      console.error("ERROR: Missing Ozow credentials!");
+      console.error("OZOW_SITE_CODE:", OZOW_SITE_CODE ? "SET" : "MISSING");
+      console.error("OZOW_PRIVATE_KEY:", OZOW_PRIVATE_KEY ? "SET" : "MISSING");
       return res.status(500).json({
         error: "Ozow credentials not configured",
         message: "Payment system is not properly configured. Please contact support."
@@ -191,6 +202,14 @@ router.post("/initiate", async (req, res) => {
       IsTest: IS_TEST,
       HashCheck: hashCheck,
     };
+
+    console.log("=== OZOW PAYMENT DATA GENERATED ===");
+    console.log("Payment URL:", OZOW_PAY_URL);
+    console.log("Transaction Reference:", transactionReference);
+    console.log("Amount:", amountFormatted);
+    console.log("Success URL:", successUrl);
+    console.log("Notify URL:", notifyUrl);
+    console.log("HashCheck length:", hashCheck.length);
 
     return res.json({
       status: "ok",

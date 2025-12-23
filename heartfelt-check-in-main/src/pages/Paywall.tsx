@@ -43,6 +43,9 @@ const Paywall = () => {
       setIsProcessing(true);
       
       const userId = getOrCreateTempUserId();
+      console.log("=== INITIATING OZOW PAYMENT ===");
+      console.log("User ID:", userId);
+      console.log("Plan:", plan);
 
       const response = await fetch("/api/ozow/initiate", {
         method: "POST",
@@ -50,9 +53,14 @@ const Paywall = () => {
         body: JSON.stringify({ userId, plan }),
       });
 
+      console.log("API Response Status:", response.status);
+      
       const data = await response.json();
+      console.log("API Response Data:", JSON.stringify(data, null, 2));
 
       if (data.status === "ok" && data.paymentUrl && data.paymentData) {
+        console.log("Payment URL received:", data.paymentUrl);
+        console.log("Transaction Reference:", data.paymentData.TransactionReference);
         localStorage.setItem("pending_payment_plan", plan);
         localStorage.setItem("pending_transaction_ref", data.paymentData.TransactionReference);
         
@@ -70,12 +78,19 @@ const Paywall = () => {
         });
 
         document.body.appendChild(form);
+        console.log("=== SUBMITTING FORM TO OZOW ===");
         form.submit();
       } else {
-        throw new Error(data.message || data.error || "Failed to initiate payment");
+        console.error("=== OZOW INITIATION FAILED ===");
+        console.error("Response data:", data);
+        const errorMsg = data.message || data.error || "Failed to initiate payment";
+        toast.error(errorMsg);
+        setIsProcessing(false);
+        setConfirmingPlan(null);
       }
     } catch (error) {
-      console.error("Payment initiation error:", error);
+      console.error("=== PAYMENT INITIATION ERROR ===");
+      console.error("Error:", error);
       toast.error("Failed to start payment. Please try again.");
       setIsProcessing(false);
       setConfirmingPlan(null);

@@ -1,0 +1,165 @@
+🧠 The real root cause (what’s actually broken)
+
+The flow currently is:
+
+Frontend
+→ calls backend: /create-ozow-payment
+→ backend should return { redirectUrl }
+→ frontend sets window.location = redirectUrl
+
+
+What’s happening instead:
+
+Frontend
+→ calls backend
+→ backend FAILS (or returns error / empty)
+→ frontend shows “Redirecting…”
+→ no URL → redirect fails
+
+
+That’s why you see:
+
+Spinner
+
+Then failure
+
+No Ozow page
+
+🚨 Why this happens MOST OFTEN (top 4 causes)
+
+Based on Ozow + Replit + Express setups, one of these is almost certainly true:
+
+1️⃣ Backend route is not reachable in production
+
+Common on Replit:
+
+Frontend is running
+
+Backend server is running
+
+BUT the frontend is calling the wrong URL (e.g. localhost)
+
+✅ This is the #1 cause
+
+2️⃣ Backend is throwing an error when generating the Ozow hash
+
+If:
+
+Site Code
+
+Private Key
+
+Amount
+
+Transaction Reference
+
+…are even slightly wrong → Ozow URL generation fails.
+
+Backend then crashes or returns 500.
+
+3️⃣ Backend returns JSON, but frontend expects a redirect
+
+Example:
+
+{ "success": true }
+
+
+instead of:
+
+{ "paymentUrl": "https://pay.ozow.com/..." }
+
+
+Frontend has nothing to redirect to.
+
+4️⃣ Environment variables not available in production
+
+Very common on Replit:
+
+Works locally
+
+Fails after publish
+
+process.env.OZOW_* is undefined
+
+Backend can’t build the payment URL.
+
+✅ What to do NEXT (this is the correct fix path)
+Step 1 — You MUST log the backend response
+
+Tell Replit AI to log what the backend returns when you click “Continue to Secure Payment”.
+
+You want to know:
+
+Is the backend being called?
+
+Is it returning a URL?
+
+Is it erroring?
+
+🧩 EXACT prompt to give Replit AI (copy-paste)
+The Ozow redirect is failing.
+
+Symptoms:
+- User reaches "Redirecting to payment..."
+- No redirect to Ozow occurs
+- Payment flow fails silently
+
+Debug requirements:
+1. Add server-side logging to the Ozow payment creation endpoint:
+   - Log when the endpoint is hit
+   - Log the generated Ozow payment URL
+   - Log any errors during hash / URL generation
+
+2. Ensure the frontend:
+   - Receives a `paymentUrl` from the backend
+   - Only shows "Redirecting..." AFTER receiving the URL
+   - Logs the response if no URL is returned
+
+3. Verify that:
+   - Backend endpoint is reachable in production
+   - Frontend is calling the correct backend URL (not localhost)
+   - OZOW_SITE_CODE, OZOW_PRIVATE_KEY, OZOW_API_KEY are available in production
+
+Do NOT change UX.
+This is a backend redirect debugging task.
+
+🧪 What a SUCCESSFUL run should look like (for you)
+
+When it’s fixed, this will happen:
+
+Click Continue to Secure Payment
+
+Brief “Redirecting…”
+
+Browser URL changes to:
+
+https://pay.ozow.com/...
+
+
+Ozow bank selection page loads
+
+If step 3 does not happen → backend is still broken.
+
+🛑 Important instruction for you right now
+
+Do NOT keep testing payments until this is fixed, because:
+
+You may create orphaned payments
+
+You may confuse the state further
+
+Fix redirect first → then test once.
+
+🧠 Final clarity (this is the key sentence)
+
+Your app is not failing to decide WHEN to pay — it is failing to generate and return the Ozow payment URL.
+
+Once that single issue is fixed, everything else you built will suddenly work:
+
+Confirmation screen ✔
+
+Anonymous payments ✔
+
+Post-payment flow ✔
+
+Profile subscription state ✔
