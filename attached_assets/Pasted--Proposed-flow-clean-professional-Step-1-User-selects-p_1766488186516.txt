@@ -1,0 +1,111 @@
+🧠 Proposed flow (clean & professional)
+Step 1 — User selects plan
+
+Free Trial
+
+Monthly / Annual / Lifetime
+
+Step 2 — User clicks Continue
+If Free Trial
+
+✅ Go straight into the app (as now)
+
+If Paid plan
+
+➡️ Show a confirmation screen
+
+🖥️ Example: Payment Confirmation Screen (UX copy)
+
+Title:
+
+Confirm your subscription
+
+Content:
+
+You’re about to subscribe to:
+Annual Access — R349 / year
+
+What happens next:
+
+You’ll be redirected to Ozow to complete payment securely
+
+We don’t store your payment details
+
+After payment:
+
+If you’re signed in → your subscription activates immediately
+
+If you’re anonymous → you’ll be asked to create an account to activate it
+
+Buttons:
+
+🔒 Continue to Secure Payment
+
+← Go back
+
+This screen removes all ambiguity.
+
+✅ Why this is a VERY good idea
+
+Reduces “I paid but nothing happened” confusion
+
+Sets expectations for anonymous users
+
+Increases trust before redirecting to Ozow
+
+Looks professional and intentional
+
+Reduces refunds & support messages
+
+This is exactly what mature SaaS apps do.
+
+🟢 Is this technically possible?
+
+Yes — very easy, and it does NOT affect Ozow at all.
+
+You are only:
+
+Adding a UI step
+
+Not changing payment logic
+
+Not touching backend complexity
+
+🧩 What to tell Replit AI (exact prompt)
+
+Copy–paste this:
+
+Before redirecting users to Ozow for paid subscriptions, add a confirmation step.
+
+Requirements:
+- If user selects Free Trial → enter app immediately (no change)
+- If user selects a paid plan (Monthly, Annual, Lifetime):
+  - Do NOT redirect to Ozow immediately
+  - Show a confirmation screen that displays:
+    - Selected plan name
+    - Price
+    - Clear message that user will be redirected to Ozow
+    - Explanation of what happens after payment, especially for anonymous users
+  - Include two buttons:
+    - "Continue to Secure Payment" → redirects to Ozow
+    - "Go back" → returns to plan selection
+
+Do NOT change Ozow integration.
+This is a UX clarification step only.
+Keep the design consistent with the current app style.
+
+🧪 How this helps your current bug scenario
+
+If this screen existed earlier:
+
+You would have clearly seen “Annual — R349”
+
+You would have seen “After payment you must create an account”
+
+The flow would have felt intentional, not broken
+
+So you’re solving both:
+
+A UX issue
+
+A trust issue
