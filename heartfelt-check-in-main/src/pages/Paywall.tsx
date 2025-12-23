@@ -59,8 +59,11 @@ const Paywall = () => {
       console.log("API Response Data:", JSON.stringify(data, null, 2));
 
       if (data.status === "ok" && data.paymentUrl && data.paymentData) {
-        console.log("Payment URL received:", data.paymentUrl);
+        console.log("=== PAYMENT DATA RECEIVED ===");
+        console.log("Payment URL:", data.paymentUrl);
         console.log("Transaction Reference:", data.paymentData.TransactionReference);
+        console.log("Full payment data:", JSON.stringify(data.paymentData, null, 2));
+        
         localStorage.setItem("pending_payment_plan", plan);
         localStorage.setItem("pending_transaction_ref", data.paymentData.TransactionReference);
         
@@ -68,17 +71,25 @@ const Paywall = () => {
         form.method = "POST";
         form.action = data.paymentUrl;
         form.style.display = "none";
+        form.id = "ozow-payment-form";
 
+        console.log("=== CREATING FORM INPUTS ===");
         Object.entries(data.paymentData).forEach(([key, value]) => {
           const input = document.createElement("input");
           input.type = "hidden";
           input.name = key;
           input.value = String(value);
           form.appendChild(input);
+          console.log(`  Field: ${key} = ${String(value).substring(0, 50)}${String(value).length > 50 ? '...' : ''}`);
         });
 
         document.body.appendChild(form);
-        console.log("=== SUBMITTING FORM TO OZOW ===");
+        
+        console.log("=== OZOW FORM SUBMITTING NOW ===");
+        console.log("Form action:", form.action);
+        console.log("Form method:", form.method);
+        console.log("Form element count:", form.elements.length);
+        
         form.submit();
       } else {
         console.error("=== OZOW INITIATION FAILED ===");
