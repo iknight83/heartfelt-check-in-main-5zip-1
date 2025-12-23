@@ -20,11 +20,10 @@ interface InitiatePaymentRequest {
   plan: "monthly" | "annual" | "lifetime";
 }
 
-const generateTransactionReference = (userId: string): string => {
-  const timestamp = Date.now().toString(36);
-  const random = crypto.randomBytes(8).toString("hex");
-  const userHash = crypto.createHash("sha256").update(userId).digest("hex").slice(0, 8);
-  return `HCI_${userHash}_${timestamp}_${random}`;
+const generateTransactionReference = (): string => {
+  const timestamp = Date.now();
+  const random = crypto.randomBytes(4).toString("hex").toUpperCase();
+  return `HFCHK-${timestamp}-${random}`;
 };
 
 const PLAN_PRICES: Record<string, number> = {
@@ -96,13 +95,15 @@ const verifyOzowNotificationHash = (params: {
 };
 
 router.post("/initiate", async (req, res) => {
-  console.log("=== OZOW INITIATE ENDPOINT HIT ===");
+  console.log("=== OZOW INITIATE CALLED ===");
   console.log("Request body:", JSON.stringify(req.body, null, 2));
-  console.log("OZOW_SITE_CODE configured:", !!OZOW_SITE_CODE);
-  console.log("OZOW_PRIVATE_KEY configured:", !!OZOW_PRIVATE_KEY);
-  console.log("OZOW_API_KEY configured:", !!OZOW_API_KEY);
-  console.log("IS_TEST mode:", IS_TEST);
-  console.log("REPLIT_DEV_DOMAIN:", process.env.REPLIT_DEV_DOMAIN);
+  console.log("Environment check:");
+  console.log("  - OZOW_SITE_CODE:", OZOW_SITE_CODE ? "configured" : "MISSING");
+  console.log("  - OZOW_PRIVATE_KEY:", OZOW_PRIVATE_KEY ? "configured" : "MISSING");
+  console.log("  - OZOW_API_KEY:", OZOW_API_KEY ? "configured" : "MISSING");
+  console.log("  - IS_TEST mode:", IS_TEST);
+  console.log("  - REPLIT_DEV_DOMAIN:", process.env.REPLIT_DEV_DOMAIN || "not set");
+  console.log("  - REPLIT_DEPLOYMENT_URL:", process.env.REPLIT_DEPLOYMENT_URL || "not set");
   
   try {
     if (!OZOW_SITE_CODE || !OZOW_PRIVATE_KEY) {
@@ -124,7 +125,7 @@ router.post("/initiate", async (req, res) => {
       });
     }
 
-    const transactionReference = generateTransactionReference(userId);
+    const transactionReference = generateTransactionReference();
     const bankReference = `Heartfelt ${plan.charAt(0).toUpperCase() + plan.slice(1)}`;
 
     if (!VALID_PLANS.includes(plan as typeof VALID_PLANS[number])) {
@@ -142,9 +143,13 @@ router.post("/initiate", async (req, res) => {
       });
     }
 
-    const baseUrl = process.env.REPLIT_DEV_DOMAIN 
-      ? `https://${process.env.REPLIT_DEV_DOMAIN}`
-      : "http://localhost:5000";
+    const baseUrl = process.env.REPLIT_DEPLOYMENT_URL 
+      ? `https://${process.env.REPLIT_DEPLOYMENT_URL}`
+      : process.env.REPLIT_DEV_DOMAIN 
+        ? `https://${process.env.REPLIT_DEV_DOMAIN}`
+        : "http://localhost:5000";
+    
+    console.log("Base URL for callbacks:", baseUrl);
 
     const successUrl = `${baseUrl}/payment/success?ref=${transactionReference}`;
     const cancelUrl = `${baseUrl}/payment/cancel?ref=${transactionReference}`;
@@ -228,8 +233,11 @@ router.post("/initiate", async (req, res) => {
 router.use("/notify", express.urlencoded({ extended: true }));
 
 router.post("/notify", async (req, res) => {
+  console.log("=== OZOW NOTIFY RECEIVED ===");
+  console.log("Headers:", JSON.stringify(req.headers, null, 2));
+  console.log("Body:", JSON.stringify(req.body, null, 2));
+  
   try {
-    console.log("Ozow callback received:", JSON.stringify(req.body, null, 2));
 
     const {
       SiteCode,
@@ -245,7 +253,7 @@ router.post("/notify", async (req, res) => {
 
     if (!TransactionReference) {
       console.warn("Missing TransactionReference in Ozow callback");
-      return res.sendStatus(200);
+      return res.status(200).json({ ok: true, message: "Missing TransactionReference" });
     }
 
     const paymentResult = await pool.query(
@@ -332,11 +340,12 @@ router.post("/notify", async (req, res) => {
     }
 
     console.log(`Payment status updated for ${TransactionReference}: ${payment.status} -> ${newStatus}`);
+    console.log("=== OZOW NOTIFY COMPLETE ===");
 
-    res.sendStatus(200);
+    return res.status(200).json({ ok: true });
   } catch (error) {
     console.error("Ozow notify error:", error);
-    res.sendStatus(200);
+    return res.status(200).json({ ok: true, error: "Processing error" });
   }
 });
 

@@ -1,0 +1,149 @@
+REPLIT PROMPT (COPY & PASTE EXACTLY)
+
+Context:
+This project is a production Express + Vite app using Ozow as the payment gateway.
+Ozow Site configuration is complete and requires strict compliance with its payment spec.
+
+Goal:
+Fix and verify the Ozow payment flow so payments redirect correctly, callbacks succeed, and subscriptions activate reliably.
+
+Tasks to complete
+1️⃣ Fix & verify Ozow initiate endpoint
+
+Ensure /api/ozow/initiate:
+
+Returns JSON only
+
+Includes ALL required Ozow fields
+
+Generates a TransactionReference that:
+
+Matches regex: [A-Za-z0-9_-]+
+
+Example format: HFCHK-<timestamp>
+
+Uses absolute URLs for:
+
+CancelUrl
+
+ErrorUrl
+
+SuccessUrl
+
+NotifyUrl
+
+2️⃣ Ensure Notify URL works (CRITICAL)
+
+Implement:
+
+POST /api/ozow/notify
+
+
+This endpoint must:
+
+Accept application/x-www-form-urlencoded
+
+Log the full payload for debugging
+
+Respond with HTTP 200
+
+Return JSON: { "ok": true }
+
+NEVER redirect
+
+NEVER require auth
+
+NEVER return HTML
+
+3️⃣ Fix frontend payment submission
+
+Confirm frontend:
+
+Calls /api/ozow/initiate
+
+Receives payment fields
+
+Dynamically builds an HTML <form>
+
+Uses:
+
+method="POST"
+action="https://pay.ozow.com"
+
+
+Appends all fields as hidden inputs
+
+Submits using form.submit()
+
+4️⃣ Subscription activation logic
+
+After Notify callback:
+
+Verify hash/signature (if implemented)
+
+Mark subscription as active in database
+
+Store:
+
+TransactionReference
+
+Amount
+
+Status
+
+UserId (or anonymous session ID)
+
+Ensure Profile page:
+
+Checks subscription status from server
+
+Hides payment options when active
+
+5️⃣ Production safety checks
+
+Remove any:
+
+Wildcard routes using "*" that break path-to-regexp
+
+Use correct SPA fallback:
+
+app.get(/.*/, ...)
+
+
+Ensure server:
+
+Serves dist/ in production
+
+Runs on a single port
+
+Handles /api/* routes correctly
+
+Final verification
+
+Add clear console logs:
+
+OZOW INITIATE CALLED
+
+OZOW FORM SUBMITTING
+
+OZOW NOTIFY RECEIVED
+
+Provide a short summary of:
+
+What was fixed
+
+What to test next
+
+Any remaining risks
+
+✅ Expected result
+
+Ozow payment page opens (no error modal)
+
+User completes bank payment
+
+Ozow calls /api/ozow/notify
+
+User is redirected to success page
+
+Subscription becomes active immediately
