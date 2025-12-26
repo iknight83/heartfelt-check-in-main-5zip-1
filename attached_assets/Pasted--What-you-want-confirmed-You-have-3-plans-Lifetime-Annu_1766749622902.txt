@@ -1,0 +1,218 @@
+✅ What you want (confirmed)
+
+You have 3 plans:
+
+Lifetime
+
+Annual (365 days)
+
+Monthly (30 days, rolling from payment date)
+
+And Deeper Insights must behave like this:
+
+Plan	Access rule
+Lifetime	🔓 Always unlocked forever
+Annual	🔓 Unlocked for 365 days, then 🔒 locked
+Monthly	🔓 Unlocked for 30 days, then 🔒 locked
+
+If access expires:
+
+The account still exists
+
+Basic features still work
+
+Deeper Insights are locked
+
+User sees “Subscribe to unlock deeper insights”
+
+This is exactly correct SaaS behavior 👍
+
+🧠 The CORRECT way to implement this (important)
+❌ What NOT to do
+
+❌ Don’t rely only on Paystack
+
+❌ Don’t check “last payment” loosely
+
+❌ Don’t hardcode dates in frontend
+
+✅ What to do
+
+You must base access only on backend subscription state.
+
+🗂️ Database structure (simple & solid)
+
+You should have a subscriptions table like this:
+
+subscriptions
+- id
+- user_id
+- plan_type        -- 'lifetime' | 'annual' | 'monthly'
+- status           -- 'active' | 'expired'
+- started_at       -- payment date
+- expires_at       -- NULL for lifetime
+- created_at
+
+How expiry works
+
+Lifetime
+
+expires_at = NULL
+
+status = active
+
+Annual
+
+expires_at = started_at + 365 days
+
+Monthly
+
+expires_at = started_at + 30 days
+
+🔐 Single source of truth (MOST IMPORTANT RULE)
+
+The backend decides access — never the frontend
+
+Every time the app loads Deeper Insights, the backend checks:
+
+if (
+  subscription.plan_type === 'lifetime'
+) {
+  allowAccess
+}
+else if (
+  subscription.expires_at > now
+) {
+  allowAccess
+}
+else {
+  denyAccess
+}
+
+
+That’s it. No exceptions.
+
+⏱️ What happens over time (exact behavior)
+🟢 Lifetime user
+
+Pays once
+
+expires_at = NULL
+
+Never sees:
+
+“Subscribe”
+
+Paywall
+
+Lock screen
+
+Even 5 years later → still unlocked
+
+🟡 Annual user
+
+Pays on 21 June 2025
+
+expires_at = 21 June 2026
+
+On 22 June 2026:
+
+Deeper Insights 🔒 locked
+
+UI shows:
+
+“Your subscription has expired. Renew to unlock deeper insights.”
+
+Once they pay again:
+
+New started_at
+
+New expires_at
+
+🔵 Monthly user
+
+Pays on 21 June
+
+expires_at = 21 July
+
+On 21–22 July:
+
+Deeper Insights 🔒 locked
+
+Paywall appears
+
+After payment → unlocked again
+
+⚠️ It is not calendar-based
+It’s rolling from payment date (which is correct).
+
+🧩 How the UI should behave
+If subscription is active
+
+Deeper Insights page loads normally
+
+If expired / no subscription
+
+Deeper Insights page:
+
+Locked blur OR empty state
+
+CTA button:
+“Subscribe to unlock deeper insights”
+
+🔄 Webhook responsibility (Paystack)
+
+When Paystack confirms payment:
+
+Verify signature
+
+Identify plan type
+
+Create or update subscription:
+
+started_at = now
+
+expires_at = based on plan
+
+status = active
+
+❌ Do NOT trust frontend for this
+
+🧪 Edge cases handled correctly
+
+✔ User logs in on new device → still works
+✔ User clears cache → still works
+✔ User reinstalls app → still works
+✔ User pays early → expiry extends correctly
+✔ User forgets to pay → auto-lock works
+
+🧠 One VERY important rule (read this twice)
+
+Never delete subscriptions.
+Only mark them expired.
+
+This lets you:
+
+Track revenue
+
+See churn
+
+Offer discounts later
+
+Restore users correctly
+
+✅ Final confirmation
+
+What you described is:
+
+✅ Correct
+
+✅ Standard SaaS logic
+
+✅ Scalable
+
+✅ Safe
+
+✅ App-store compliant
+
+You’re thinking like a real product owner now, not just a developer 👏

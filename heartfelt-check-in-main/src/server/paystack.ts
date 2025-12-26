@@ -17,17 +17,146 @@ const PLAN_PRICES: Record<string, number> = {
 };
 
 const VALID_PLANS = ["monthly", "annual", "lifetime"] as const;
+type PlanType = "monthly" | "annual" | "lifetime";
 
 interface InitiatePaymentRequest {
   userId: string;
-  plan: "monthly" | "annual" | "lifetime";
+  plan: PlanType;
   email?: string;
+}
+
+interface SubscriptionAccess {
+  hasAccess: boolean;
+  plan: string | null;
+  status: "active" | "expired" | "none";
+  expiresAt: Date | null;
+  isLifetime: boolean;
 }
 
 const generateReference = (): string => {
   const timestamp = Date.now();
   const random = crypto.randomBytes(4).toString("hex").toUpperCase();
   return `HFCHK-${timestamp}-${random}`;
+};
+
+const calculateExpiryDate = (plan: PlanType, startDate: Date = new Date()): Date | null => {
+  if (plan === "lifetime") {
+    return null;
+  }
+  
+  const expiryDate = new Date(startDate);
+  
+  if (plan === "annual") {
+    expiryDate.setDate(expiryDate.getDate() + 365);
+  } else if (plan === "monthly") {
+    expiryDate.setDate(expiryDate.getDate() + 30);
+  }
+  
+  return expiryDate;
+};
+
+const getUserSubscriptionAccess = async (userId: string): Promise<SubscriptionAccess> => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM subscriptions WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (result.rows.length === 0) {
+      return {
+        hasAccess: false,
+        plan: null,
+        status: "none",
+        expiresAt: null,
+        isLifetime: false,
+      };
+    }
+
+    const subscription = result.rows[0];
+    const now = new Date();
+
+    if (subscription.plan === "lifetime") {
+      if (!subscription.is_active) {
+        await pool.query(
+          `UPDATE subscriptions SET is_active = true, updated_at = NOW() WHERE user_id = $1`,
+          [userId]
+        );
+      }
+      return {
+        hasAccess: true,
+        plan: subscription.plan,
+        status: "active",
+        expiresAt: null,
+        isLifetime: true,
+      };
+    }
+
+    if (subscription.expires_at && new Date(subscription.expires_at) > now) {
+      if (!subscription.is_active) {
+        await pool.query(
+          `UPDATE subscriptions SET is_active = true, updated_at = NOW() WHERE user_id = $1`,
+          [userId]
+        );
+      }
+      return {
+        hasAccess: true,
+        plan: subscription.plan,
+        status: "active",
+        expiresAt: subscription.expires_at,
+        isLifetime: false,
+      };
+    }
+
+    if (subscription.is_active) {
+      await pool.query(
+        `UPDATE subscriptions SET is_active = false, updated_at = NOW() WHERE user_id = $1`,
+        [userId]
+      );
+    }
+
+    return {
+      hasAccess: false,
+      plan: subscription.plan,
+      status: "expired",
+      expiresAt: subscription.expires_at,
+      isLifetime: false,
+    };
+  } catch (error) {
+    console.error("Error checking subscription access:", error);
+    return {
+      hasAccess: false,
+      plan: null,
+      status: "none",
+      expiresAt: null,
+      isLifetime: false,
+    };
+  }
+};
+
+const activateSubscription = async (userId: string, plan: PlanType, paymentId: number): Promise<void> => {
+  const now = new Date();
+  const expiresAt = calculateExpiryDate(plan, now);
+
+  console.log(`=== ACTIVATING SUBSCRIPTION ===`);
+  console.log(`User: ${userId}`);
+  console.log(`Plan: ${plan}`);
+  console.log(`Started: ${now.toISOString()}`);
+  console.log(`Expires: ${expiresAt ? expiresAt.toISOString() : "NEVER (lifetime)"}`);
+
+  await pool.query(
+    `INSERT INTO subscriptions (user_id, plan, is_active, activated_at, expires_at, payment_id)
+     VALUES ($1, $2, true, $3, $4, $5)
+     ON CONFLICT (user_id) DO UPDATE SET
+       plan = EXCLUDED.plan,
+       is_active = true,
+       activated_at = EXCLUDED.activated_at,
+       expires_at = EXCLUDED.expires_at,
+       payment_id = EXCLUDED.payment_id,
+       updated_at = NOW()`,
+    [userId, plan, now, expiresAt, paymentId]
+  );
+
+  console.log(`=== SUBSCRIPTION ACTIVATED SUCCESSFULLY ===`);
 };
 
 router.post("/initiate", async (req, res) => {
@@ -196,7 +325,7 @@ router.post("/webhook", async (req, res) => {
     if (event === "charge.success") {
       const { reference, amount, metadata } = data;
       const userId = metadata?.userId;
-      const plan = metadata?.plan;
+      const plan = metadata?.plan as PlanType;
 
       console.log(`Processing successful charge for reference: ${reference}`);
 
@@ -205,13 +334,17 @@ router.post("/webhook", async (req, res) => {
         [reference]
       );
 
+      let paymentId: number;
+
       if (paymentResult.rows.length === 0) {
         console.log("Payment not found in database, creating new record");
-        await pool.query(
+        const insertResult = await pool.query(
           `INSERT INTO payments (transaction_reference, user_id, plan, amount, status, verified_at)
-           VALUES ($1, $2, $3, $4, 'complete', NOW())`,
+           VALUES ($1, $2, $3, $4, 'complete', NOW())
+           RETURNING id`,
           [reference, userId || "unknown", plan || "unknown", amount / 100]
         );
+        paymentId = insertResult.rows[0].id;
       } else {
         await pool.query(
           `UPDATE payments 
@@ -219,32 +352,11 @@ router.post("/webhook", async (req, res) => {
            WHERE transaction_reference = $1`,
           [reference]
         );
+        paymentId = paymentResult.rows[0].id;
       }
 
-      const updatedPayment = await pool.query(
-        `SELECT id, user_id, plan FROM payments WHERE transaction_reference = $1`,
-        [reference]
-      );
-
-      if (updatedPayment.rows.length > 0) {
-        const payment = updatedPayment.rows[0];
-        
-        if (payment.user_id && payment.user_id !== "unknown") {
-          await pool.query(
-            `INSERT INTO subscriptions (user_id, plan, is_active, activated_at, payment_id)
-             VALUES ($1, $2, true, NOW(), $3)
-             ON CONFLICT (user_id) DO UPDATE SET
-               plan = EXCLUDED.plan,
-               is_active = true,
-               activated_at = NOW(),
-               payment_id = EXCLUDED.payment_id,
-               updated_at = NOW()`,
-            [payment.user_id, payment.plan, payment.id]
-          );
-
-          console.log("=== SUBSCRIPTION ACTIVATED ===");
-          console.log(`User: ${payment.user_id}, Plan: ${payment.plan}`);
-        }
+      if (userId && userId !== "unknown" && plan && VALID_PLANS.includes(plan)) {
+        await activateSubscription(userId, plan, paymentId);
       }
     }
 
@@ -286,7 +398,7 @@ router.post("/verify", async (req, res) => {
     if (verifyData.status && verifyData.data.status === "success") {
       const { metadata } = verifyData.data;
       const userId = metadata?.userId;
-      const plan = metadata?.plan;
+      const plan = metadata?.plan as PlanType;
 
       await pool.query(
         `UPDATE payments 
@@ -300,23 +412,9 @@ router.post("/verify", async (req, res) => {
         [reference]
       );
 
-      if (paymentResult.rows.length > 0 && userId && userId !== "unknown") {
+      if (paymentResult.rows.length > 0 && userId && userId !== "unknown" && plan && VALID_PLANS.includes(plan)) {
         const paymentId = paymentResult.rows[0].id;
-        
-        await pool.query(
-          `INSERT INTO subscriptions (user_id, plan, is_active, activated_at, payment_id)
-           VALUES ($1, $2, true, NOW(), $3)
-           ON CONFLICT (user_id) DO UPDATE SET
-             plan = EXCLUDED.plan,
-             is_active = true,
-             activated_at = NOW(),
-             payment_id = EXCLUDED.payment_id,
-             updated_at = NOW()`,
-          [userId, plan, paymentId]
-        );
-
-        console.log("=== SUBSCRIPTION ACTIVATED (via verify) ===");
-        console.log(`User: ${userId}, Plan: ${plan}`);
+        await activateSubscription(userId, plan, paymentId);
       }
 
       return res.json({
@@ -345,34 +443,52 @@ router.post("/verify", async (req, res) => {
 router.get("/subscription/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-
-    const result = await pool.query(
-      `SELECT s.*, p.plan as payment_plan, p.amount 
-       FROM subscriptions s 
-       LEFT JOIN payments p ON s.payment_id = p.id
-       WHERE s.user_id = $1 AND s.is_active = true`,
-      [userId]
-    );
-
-    if (result.rows.length === 0) {
-      return res.json({
-        hasSubscription: false,
-      });
-    }
-
-    const subscription = result.rows[0];
+    const access = await getUserSubscriptionAccess(userId);
 
     return res.json({
-      hasSubscription: true,
-      plan: subscription.plan,
-      activatedAt: subscription.activated_at,
-      expiresAt: subscription.expires_at,
+      hasSubscription: access.hasAccess,
+      plan: access.plan,
+      status: access.status,
+      expiresAt: access.expiresAt,
+      isLifetime: access.isLifetime,
     });
   } catch (error) {
     console.error("Get subscription error:", error);
     return res.status(500).json({
       hasSubscription: false,
+      status: "none",
       message: "Failed to check subscription"
+    });
+  }
+});
+
+router.get("/access/:userId", async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const access = await getUserSubscriptionAccess(userId);
+
+    if (!access.hasAccess) {
+      return res.status(403).json({
+        hasAccess: false,
+        status: access.status,
+        message: access.status === "expired" 
+          ? "Your subscription has expired. Renew to unlock deeper insights."
+          : "Subscription required to access deeper insights"
+      });
+    }
+
+    return res.json({
+      hasAccess: true,
+      plan: access.plan,
+      status: access.status,
+      expiresAt: access.expiresAt,
+      isLifetime: access.isLifetime,
+    });
+  } catch (error) {
+    console.error("Check access error:", error);
+    return res.status(500).json({
+      hasAccess: false,
+      message: "Failed to check access"
     });
   }
 });

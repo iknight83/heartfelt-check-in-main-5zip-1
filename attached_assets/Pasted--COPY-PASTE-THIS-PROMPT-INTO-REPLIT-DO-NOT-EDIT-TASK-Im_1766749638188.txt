@@ -1,0 +1,83 @@
+✅ COPY-PASTE THIS PROMPT INTO REPLIT (DO NOT EDIT)
+TASK: Implement strict subscription access control for “Deeper Insights”.
+
+IMPORTANT RULE:
+The backend is the ONLY source of truth.
+Frontend must NEVER decide subscription access.
+
+PLANS:
+- lifetime
+- annual (365 days)
+- monthly (30 days rolling from payment date)
+
+DATABASE RULES:
+Use the existing `subscriptions` table.
+Each subscription MUST have:
+- user_id
+- plan_type: 'lifetime' | 'annual' | 'monthly'
+- started_at (timestamp)
+- expires_at (timestamp OR NULL for lifetime)
+- status: 'active' | 'expired'
+
+EXPIRY LOGIC (MANDATORY):
+- lifetime → expires_at = NULL, always active
+- annual → expires_at = started_at + 365 days
+- monthly → expires_at = started_at + 30 days
+
+BACKEND ACCESS CHECK (REQUIRED):
+Create a backend helper function:
+- getUserSubscriptionStatus(user_id)
+
+Logic:
+IF no subscription → access = false
+IF plan_type === 'lifetime' → access = true
+IF expires_at > current_time → access = true
+ELSE:
+  - mark subscription as status = 'expired'
+  - access = false
+
+DEEPER INSIGHTS ACCESS:
+- ALL Deeper Insights API routes MUST check subscription access
+- If access = false → return HTTP 403 with message:
+  "Subscription required to access deeper insights"
+
+FRONTEND BEHAVIOR:
+- Frontend MUST call backend to check access
+- If backend returns access = false:
+  - show locked state
+  - show “Subscribe to unlock deeper insights”
+- If backend returns access = true:
+  - show Deeper Insights normally
+
+PAYSTACK WEBHOOK REQUIREMENTS:
+On successful Paystack payment:
+- Identify plan type (lifetime / annual / monthly)
+- Create OR update subscription:
+  - started_at = now
+  - expires_at = based on plan rules
+  - status = 'active'
+
+DO NOT:
+- DO NOT delete old subscriptions
+- DO NOT hardcode dates in frontend
+- DO NOT allow frontend to bypass backend checks
+
+SUCCESS CONDITIONS:
+- Lifetime users NEVER see subscription prompts again
+- Annual users lose access after 365 days if not renewed
+- Monthly users lose access after 30 days if not renewed
+- Deeper Insights are ALWAYS locked when subscription is inactive
+
+This logic must be enforced on every request.
+
+🧠 Why this works
+
+No vague wording
+
+No “maybe”
+
+No UI decisions
+
+Forces backend enforcement
+
+Prevents Replit from “guessing”
