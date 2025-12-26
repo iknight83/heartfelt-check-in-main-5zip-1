@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import CheckInScreen from "@/components/CheckInScreen";
 import DurationScreen from "@/components/DurationScreen";
 import SupportCheckScreen from "@/components/SupportCheckScreen";
 import JourneyAuthScreen from "@/components/JourneyAuthScreen";
 import ReminderScreen from "@/components/ReminderScreen";
-import FactorsPreviewScreen from "@/components/FactorsPreviewScreen";
 import FactorSelectionScreen from "@/components/FactorSelectionScreen";
 import PaywallScreen from "@/components/PaywallScreen";
 import { useAuth } from "@/hooks/useAuth";
@@ -18,13 +17,17 @@ interface UserSelections {
   authMethod: "google" | "apple" | "anonymous" | "email" | null;
   reminderTime: string | null;
   trackingFactors: string[] | null;
-  selectedPlan: "lifetime" | "annual" | "monthly" | null;
+  selectedPlan: "lifetime" | "annual" | "monthly" | "trial" | null;
+  pendingPaymentRef: string | null;
 }
+
+type OnboardingStep = "emotions" | "duration" | "support" | "factorSelection" | "paywall" | "reminder" | "auth";
 
 const Index = () => {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user, loading } = useAuth();
-  const [step, setStep] = useState<"emotions" | "duration" | "support" | "factorSelection" | "auth" | "reminder" | "paywall">("emotions");
+  const [step, setStep] = useState<OnboardingStep>("emotions");
   const [selections, setSelections] = useState<UserSelections>({
     emotions: [],
     duration: null,
@@ -34,35 +37,46 @@ const Index = () => {
     reminderTime: null,
     trackingFactors: null,
     selectedPlan: null,
+    pendingPaymentRef: null,
   });
 
-  // Check if user has already completed onboarding
-  // Only run once after auth loading completes to avoid race conditions
   useEffect(() => {
     if (loading) return;
     
-    // Wait a tick for localStorage to be updated after auth
     const timeoutId = setTimeout(() => {
       const userId = localStorage.getItem("current_user_id");
       
-      // Check user-specific key first, then fallback to legacy global key
       let hasCompletedOnboarding = false;
       if (userId) {
         hasCompletedOnboarding = !!localStorage.getItem(`termsAcceptedAt__${userId}`);
       }
-      // Also check legacy global key for backwards compatibility
       if (!hasCompletedOnboarding) {
         hasCompletedOnboarding = !!localStorage.getItem("termsAcceptedAt");
       }
       
       if (hasCompletedOnboarding && userId) {
-        // User already completed onboarding - go directly to home
         navigate("/home", { replace: true });
+        return;
       }
-    }, 100); // Small delay to ensure localStorage is updated
+
+      const continueStep = searchParams.get("continue");
+      if (continueStep === "reminder") {
+        setStep("reminder");
+      }
+
+      const pendingRef = localStorage.getItem("pending_transaction_ref");
+      const pendingPlan = localStorage.getItem("pending_payment_plan");
+      if (pendingRef && pendingPlan) {
+        setSelections(prev => ({
+          ...prev,
+          pendingPaymentRef: pendingRef,
+          selectedPlan: pendingPlan as "lifetime" | "annual" | "monthly",
+        }));
+      }
+    }, 100);
     
     return () => clearTimeout(timeoutId);
-  }, [navigate, loading]); // Only depend on loading, not user
+  }, [navigate, loading, searchParams]);
 
   const handleEmotionsContinue = (emotions: string[]) => {
     setSelections((prev) => ({ ...prev, emotions, skippedEmotions: false }));
@@ -84,59 +98,116 @@ const Index = () => {
     setStep("factorSelection");
   };
 
-  const handleAuthContinue = (method: "google" | "apple" | "anonymous" | "email") => {
-    setSelections((prev) => ({ ...prev, authMethod: method }));
-    
-    // Check if user already completed onboarding before (using user-isolated key)
-    const userId = localStorage.getItem("current_user_id");
-    const onboardingKey = userId ? `termsAcceptedAt__${userId}` : "termsAcceptedAt";
-    const hasCompletedOnboarding = localStorage.getItem(onboardingKey);
-    
-    // If user is authenticated with email AND already completed onboarding, they're returning - go to home
-    // Otherwise, continue with onboarding (new users need to answer questions again)
-    if (method === "email" && user && hasCompletedOnboarding) {
-      // Existing account with completed onboarding - go straight to home
-      // User's factors are already preserved in localStorage
-      navigate("/home", { replace: true });
-    } else {
-      // New user or returning user who needs to re-do onboarding - continue to reminder
-      setStep("reminder");
-    }
-  };
-
   const handleFactorSelectionContinue = (factors: string[]) => {
     setSelections((prev) => ({ ...prev, trackingFactors: factors }));
-    setStep("auth");
+    setStep("paywall");
+  };
+
+  const handlePaywallContinue = async (plan: "lifetime" | "annual" | "monthly" | "trial") => {
+    setSelections((prev) => ({ ...prev, selectedPlan: plan }));
+
+    if (plan === "trial") {
+      localStorage.setItem("pending_plan", "trial");
+      setStep("reminder");
+      return;
+    }
+
+    try {
+      const response = await fetch("/api/paystack/initiate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan, isAnonymous: true }),
+      });
+
+      const data = await response.json();
+
+      if (data.status === "ok" && data.authorizationUrl) {
+        localStorage.setItem("pending_payment_plan", plan);
+        localStorage.setItem("pending_transaction_ref", data.reference);
+        localStorage.setItem("pending_anon_user_id", data.userId);
+        window.location.href = data.authorizationUrl;
+      } else {
+        console.error("Payment initiation failed:", data);
+      }
+    } catch (error) {
+      console.error("Payment error:", error);
+    }
   };
 
   const handleReminderEnable = (time: string) => {
     setSelections((prev) => ({ ...prev, reminderTime: time }));
-    // TODO: Request notification permission here
-    setStep("paywall");
+    setStep("auth");
   };
 
   const handleReminderSkip = () => {
     setSelections((prev) => ({ ...prev, reminderTime: null }));
-    setStep("paywall");
+    setStep("auth");
   };
 
-  const handlePaywallContinue = (plan: "lifetime" | "annual" | "monthly") => {
-    setSelections((prev) => ({ ...prev, selectedPlan: plan }));
-    // Mark onboarding as completed with user-isolated key BEFORE navigating to home
+  const handleAuthComplete = async (method: "google" | "apple" | "anonymous" | "email") => {
+    setSelections((prev) => ({ ...prev, authMethod: method }));
+    
     const userId = localStorage.getItem("current_user_id");
-    const onboardingKey = userId ? `termsAcceptedAt__${userId}` : "termsAcceptedAt";
+    
+    if (!userId) {
+      console.error("No user ID after auth");
+      return;
+    }
+
+    const pendingRef = localStorage.getItem("pending_transaction_ref");
+    const pendingPlan = localStorage.getItem("pending_payment_plan") || localStorage.getItem("pending_plan");
+
+    if (pendingRef && pendingPlan && pendingPlan !== "trial") {
+      try {
+        const claimResponse = await fetch("/api/paystack/claim", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ reference: pendingRef, newUserId: userId }),
+        });
+
+        const claimData = await claimResponse.json();
+        if (claimData.success) {
+          localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
+          localStorage.setItem(`subscription_plan__${userId}`, pendingPlan);
+        }
+      } catch (error) {
+        console.error("Failed to claim subscription:", error);
+      }
+
+      localStorage.removeItem("pending_transaction_ref");
+      localStorage.removeItem("pending_payment_plan");
+      localStorage.removeItem("pending_anon_user_id");
+    }
+
+    if (pendingPlan === "trial") {
+      const trialKey = `trial_started_at__${userId}`;
+      if (!localStorage.getItem(trialKey)) {
+        localStorage.setItem(trialKey, Date.now().toString());
+      }
+      localStorage.removeItem("pending_plan");
+    }
+
+    const onboardingKey = `termsAcceptedAt__${userId}`;
     localStorage.setItem(onboardingKey, new Date().toISOString());
+
     navigate("/home", { replace: true });
   };
 
-  const handleRestorePurchases = () => {
-    // TODO: Implement restore purchases logic
-    console.log("Restore purchases requested");
-  };
+  const handleRestorePurchases = async () => {
+    const userId = localStorage.getItem("current_user_id");
+    if (!userId) return;
 
-  const handleRegister = () => {
-    // For now, treat register as email flow
-    handleAuthContinue("email");
+    try {
+      const response = await fetch(`/api/paystack/subscription/${userId}`);
+      const data = await response.json();
+      if (data.hasSubscription) {
+        localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
+        localStorage.setItem(`subscription_plan__${userId}`, data.plan);
+        navigate("/home", { replace: true });
+      }
+    } catch (error) {
+      console.error("Restore failed:", error);
+    }
   };
 
   if (step === "emotions") {
@@ -160,16 +231,16 @@ const Index = () => {
     return <FactorSelectionScreen onContinue={handleFactorSelectionContinue} onBack={() => setStep("support")} />;
   }
 
-  if (step === "auth") {
-    return <JourneyAuthScreen onContinue={handleAuthContinue} onRegister={handleRegister} onBack={() => setStep("factorSelection")} />;
+  if (step === "paywall") {
+    return <PaywallScreen onContinue={handlePaywallContinue} onRestore={handleRestorePurchases} />;
   }
 
   if (step === "reminder") {
-    return <ReminderScreen onEnable={handleReminderEnable} onSkip={handleReminderSkip} onBack={() => setStep("auth")} />;
+    return <ReminderScreen onEnable={handleReminderEnable} onSkip={handleReminderSkip} onBack={() => setStep("paywall")} />;
   }
 
-  if (step === "paywall") {
-    return <PaywallScreen onContinue={handlePaywallContinue} onRestore={handleRestorePurchases} />;
+  if (step === "auth") {
+    return <JourneyAuthScreen onContinue={handleAuthComplete} onRegister={() => handleAuthComplete("email")} onBack={() => setStep("reminder")} />;
   }
 
   return null;

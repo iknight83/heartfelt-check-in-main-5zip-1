@@ -145,28 +145,18 @@ const PaymentSuccess = () => {
           <div className="bg-card/50 rounded-xl p-4 mb-6 border border-border">
             <div className="flex items-center gap-3 mb-2">
               <UserPlus className="w-5 h-5 text-primary" />
-              <span className="font-medium text-foreground">One more step</span>
+              <span className="font-medium text-foreground">Almost there!</span>
             </div>
             <p className="text-soft text-sm text-left">
-              Create an account or sign in to activate your subscription. This ensures you can access your premium features on any device.
+              Let's finish setting up your account to secure your subscription and access all features.
             </p>
           </div>
           
           <div className="space-y-3">
-            <Button onClick={() => navigate("/auth?mode=signup&from=payment")} className="w-full">
-              Create Account
-            </Button>
-            <Button variant="outline" onClick={() => navigate("/auth?mode=signin&from=payment")} className="w-full">
-              Sign In
-            </Button>
-            <Button variant="ghost" onClick={() => navigate("/home")} className="w-full text-soft">
-              Continue Without Account
+            <Button onClick={() => navigate("/?continue=reminder")} className="w-full">
+              Continue Setup
             </Button>
           </div>
-          
-          <p className="text-xs text-soft mt-4">
-            Your subscription will remain active for this session. Create an account to keep it permanently.
-          </p>
         </div>
       </div>
     );
