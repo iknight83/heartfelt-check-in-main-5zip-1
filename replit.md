@@ -51,9 +51,15 @@ The app uses Paystack for South African payment processing with a secure server-
 
 2. **Database Tables** (PostgreSQL):
    - `payments`: transaction_reference (unique), user_id, plan, amount, status, verified_at
-   - `subscriptions`: user_id (unique), plan, is_active, activated_at, payment_id
+   - `subscriptions`: user_id (unique), plan, is_active, activated_at, expires_at, payment_id
 
-3. **Payment Flow**:
+3. **Subscription Expiry Logic** (Dec 2025):
+   - Lifetime subscriptions: expires_at = null (never expire)
+   - Annual subscriptions: expires_at = activation date + 365 days
+   - Monthly subscriptions: expires_at = activation date + 30 days
+   - Backend auto-expires subscriptions when checking access (sets is_active=false if expired)
+
+4. **Payment Flow**:
    - Client calls `/api/paystack/initiate` with userId and plan only
    - Server creates payment record and calls Paystack API to initialize transaction
    - Client redirects to Paystack's authorization_url (simple redirect, no form POST)
@@ -62,16 +68,16 @@ The app uses Paystack for South African payment processing with a secure server-
    - Server updates payment status and activates subscription
    - Client returns to callback_url and verifies payment via `/api/paystack/verify`
 
-4. **Environment Variables Required**:
+5. **Environment Variables Required**:
    - `PAYSTACK_SECRET_KEY`: Secret key from Paystack dashboard (starts with sk_)
 
-5. **API Endpoints**:
+6. **API Endpoints**:
    - `POST /api/paystack/initiate` - Creates payment and returns Paystack authorization URL
    - `POST /api/paystack/webhook` - Receives Paystack webhooks (signature-verified)
    - `POST /api/paystack/verify` - Verifies payment status with Paystack API
    - `GET /api/paystack/subscription/:userId` - Check user's active subscription
 
-6. **Testing Paystack Payments**:
+7. **Testing Paystack Payments**:
    - Use Paystack test secret key (starts with sk_test_)
    - Test cards available in Paystack documentation
    - Test flow: Paywall → Select plan → Paystack checkout → Success page
