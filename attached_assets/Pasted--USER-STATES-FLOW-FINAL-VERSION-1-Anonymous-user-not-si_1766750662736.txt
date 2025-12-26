@@ -1,0 +1,224 @@
+🧠 USER STATES & FLOW (FINAL VERSION)
+1️⃣ Anonymous user (not signed in yet)
+
+They are on onboarding.
+
+They can do ALL of these without signing up first:
+
+✅ Free Trial
+
+Continue onboarding
+
+See all onboarding steps
+
+At the end → ask them to sign up
+
+After signup → Journal
+
+✅ Monthly / Annual / Lifetime
+
+Go directly to Paystack
+
+Pay successfully
+
+Return to onboarding
+
+Continue onboarding steps
+
+At the end → ask them to sign up
+
+After signup → Journal (with access unlocked)
+
+👉 Anonymous users CAN pay
+👉 Anonymous users MUST finish onboarding
+👉 Signup happens at the END, not the start
+
+2️⃣ Anonymous user who paid (important)
+
+Payment is linked to a temporary payment_reference
+
+Subscription is stored as unclaimed
+
+After signup:
+
+Claim subscription
+
+Attach it to the new user account
+
+3️⃣ Signed-in user (first time, no data yet)
+
+Goes through onboarding
+
+If they pick a paid plan → Paystack
+
+If free trial → activate trial
+
+Finish onboarding
+
+Journal
+
+4️⃣ Signed-in user with existing data
+
+❌ NO onboarding
+
+❌ NO pricing
+
+✅ Go straight to Journal
+
+🔴 WHY IT’S BROKEN RIGHT NOW
+
+Right now your app assumes:
+
+Payment = userId exists ❌
+
+Anonymous users can’t be tied to payments ❌
+
+Onboarding logic is mixed with auth logic ❌
+
+So when:
+
+Anonymous user selects paid plan → nothing happens
+
+Or Paystack returns → no user to attach to
+
+This is frontend flow logic, not Paystack.
+
+✅ REQUIRED TECH FIX (HIGH LEVEL)
+
+You need temporary state, not auth state.
+
+Key idea:
+
+👉 Payment ≠ Account
+👉 Account claims payment later
+
+🧱 DATA MODEL (SIMPLE)
+Payments table already has:
+
+reference
+
+plan_type
+
+status
+
+user_id (nullable)
+
+When anonymous:
+
+user_id = null
+
+After signup:
+
+Attach user_id
+
+🧠 FLOW LOGIC (IN PLAIN ENGLISH)
+Anonymous user selects plan
+→ If paid: go to Paystack
+→ If free: skip Paystack
+
+After payment OR free trial:
+→ Continue onboarding pages
+
+At final onboarding step:
+→ Force signup
+→ Claim payment/subscription
+→ Go to Journal
+
+✅ EXACT REPLIT PROMPT (COPY–PASTE)
+
+This is rewritten exactly for what you want now.
+
+🧨 REPLIT PROMPT (FINAL)
+FIX ONBOARDING + PAYMENT FLOW WITH ANONYMOUS PAYMENTS.
+
+THIS IS CRITICAL. FOLLOW EXACTLY.
+
+GOAL:
+Anonymous users must be able to pay OR start a free trial WITHOUT signing up first.
+Signup happens ONLY at the end of onboarding.
+Signed-in users with data must skip onboarding entirely.
+
+REQUIREMENTS:
+
+1. Anonymous Users:
+- They can select Free Trial, Monthly, Annual, or Lifetime.
+- They DO NOT need to sign up first.
+
+IF Free Trial:
+- Continue onboarding pages normally.
+- Do NOT activate trial yet.
+- At final onboarding step:
+  → Force signup
+  → Activate free trial
+  → Redirect to Journal
+
+IF Paid Plan:
+- Redirect immediately to Paystack checkout.
+- On successful payment:
+  → Store payment with user_id = null
+  → Mark subscription as active but unclaimed
+  → Continue onboarding pages
+- At final onboarding step:
+  → Force signup
+  → Attach (claim) the paid subscription to the new user
+  → Redirect to Journal
+
+2. First-time Signed-in Users (no data yet):
+- Show onboarding.
+- Same behaviour as anonymous users, but attach payments directly to user_id.
+
+3. Existing Signed-in Users (already have journal data):
+- Skip onboarding completely.
+- Skip pricing completely.
+- Redirect directly to Journal.
+
+4. Subscription Rules:
+- Lifetime: never expires
+- Annual: expires after 365 days
+- Monthly: expires after 30 days
+- When expired:
+  → Lock "Deeper Insights" only
+  → Show paywall
+
+5. UX RULES:
+- No dead clicks.
+- No silent failures.
+- After Paystack success, user MUST return to onboarding.
+- Signup happens ONLY at the end.
+
+IMPLEMENT THIS CLEANLY.
+DO NOT FORCE SIGNUP BEFORE PAYMENT.
+DO NOT BREAK PAYSTACK FLOW.
+
+🧪 HOW YOU TEST (IMPORTANT)
+Test 1 — Anonymous Paid
+
+Incognito
+
+Select Monthly
+
+Pay
+
+Return to onboarding
+
+Finish onboarding
+
+Signup
+
+Journal unlocked ✅
+
+Test 2 — Anonymous Free Trial
+
+Select Free Trial
+
+Finish onboarding
+
+Signup
+
+Journal unlocked ✅
+
+Test 3 — Existing User
+
+Login
+
+App opens Journal immediately ✅
