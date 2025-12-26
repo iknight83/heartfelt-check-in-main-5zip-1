@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PaywallScreen from "@/components/PaywallScreen";
 import { useSubscription } from "@/hooks/useSubscription";
+import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Lock, Shield, ExternalLink, CreditCard } from "lucide-react";
@@ -23,18 +24,15 @@ const PLAN_DETAILS: Record<PaidPlanType, PlanDetails> = {
 const Paywall = () => {
   const navigate = useNavigate();
   const { subscribe } = useSubscription();
+  const { user, loading } = useAuth();
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmingPlan, setConfirmingPlan] = useState<PaidPlanType | null>(null);
-
-  const getUserId = (): string | null => {
-    return localStorage.getItem("current_user_id");
-  };
 
   const initiatePaystackPayment = async (plan: PaidPlanType) => {
     try {
       setIsProcessing(true);
       
-      const userId = getUserId();
+      const userId = user?.id;
       
       if (!userId) {
         toast.error("Please sign in to make a purchase");
@@ -104,7 +102,7 @@ const Paywall = () => {
   };
 
   const handleRestore = async () => {
-    const userId = localStorage.getItem("current_user_id");
+    const userId = user?.id;
     if (!userId) {
       toast.error("Please sign in to restore purchases");
       return;
@@ -133,11 +131,11 @@ const Paywall = () => {
     }
   };
 
-  if (isProcessing) {
+  if (loading || isProcessing) {
     return (
       <div className="min-h-screen gradient-bg flex flex-col items-center justify-center px-6">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-        <p className="text-foreground text-lg">Redirecting to payment...</p>
+        <p className="text-foreground text-lg">{isProcessing ? "Redirecting to payment..." : "Loading..."}</p>
       </div>
     );
   }
