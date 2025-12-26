@@ -85,7 +85,7 @@ const Profile = () => {
       if (!userId) return;
 
       try {
-        const response = await fetch(`/api/ozow/subscription/${userId}`);
+        const response = await fetch(`/api/paystack/subscription/${userId}`);
         const data = await response.json();
         
         if (data.hasSubscription) {
@@ -101,7 +101,7 @@ const Profile = () => {
     checkServerSubscription();
   }, []);
 
-  const initiateOzowPayment = async (plan: PlanType) => {
+  const initiatePaystackPayment = async (plan: PlanType) => {
     try {
       setIsProcessingPayment(true);
       
@@ -112,7 +112,11 @@ const Profile = () => {
         localStorage.setItem("is_anonymous_payment", "true");
       }
 
-      const response = await fetch("/api/ozow/initiate", {
+      console.log("=== PAYSTACK INITIATE ===");
+      console.log("User ID:", userId);
+      console.log("Plan:", plan);
+
+      const response = await fetch("/api/paystack/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, plan }),
@@ -120,25 +124,14 @@ const Profile = () => {
 
       const data = await response.json();
 
-      if (data.status === "ok" && data.paymentUrl && data.paymentData) {
-        localStorage.setItem("pending_payment_plan", plan);
-        localStorage.setItem("pending_transaction_ref", data.paymentData.TransactionReference);
+      if (data.status === "ok" && data.authorizationUrl) {
+        console.log("=== PAYSTACK REDIRECT ===");
+        console.log("Authorization URL:", data.authorizationUrl);
         
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = data.paymentUrl;
-        form.style.display = "none";
-
-        Object.entries(data.paymentData).forEach(([key, value]) => {
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = key;
-          input.value = String(value);
-          form.appendChild(input);
-        });
-
-        document.body.appendChild(form);
-        form.submit();
+        localStorage.setItem("pending_payment_plan", plan);
+        localStorage.setItem("pending_transaction_ref", data.reference);
+        
+        window.location.href = data.authorizationUrl;
       } else {
         throw new Error(data.message || "Failed to initiate payment");
       }
@@ -150,7 +143,7 @@ const Profile = () => {
   };
 
   const handleSubscribe = () => {
-    initiateOzowPayment(selectedPlan);
+    initiatePaystackPayment(selectedPlan);
   };
 
   const handleSignOut = async () => {

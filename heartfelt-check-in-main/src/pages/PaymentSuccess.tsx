@@ -5,15 +5,6 @@ import { Button } from "@/components/ui/button";
 
 type VerificationState = "verifying" | "success" | "success_anonymous" | "pending" | "failed";
 
-/**
- * PaymentSuccess Page - Handles post-payment verification and account linking
- * 
- * Flow:
- * 1. User returns from Ozow after successful payment
- * 2. App verifies payment with backend
- * 3. If user is signed-in → Activate subscription immediately
- * 4. If user is anonymous → Prompt to create an account to activate subscription
- */
 const PaymentSuccess = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -24,7 +15,7 @@ const PaymentSuccess = () => {
 
   useEffect(() => {
     const verifyPayment = async () => {
-      const transactionRef = searchParams.get("ref");
+      const transactionRef = searchParams.get("ref") || searchParams.get("reference") || searchParams.get("trxref");
 
       if (!transactionRef) {
         setErrorMessage("Missing transaction reference");
@@ -32,47 +23,43 @@ const PaymentSuccess = () => {
         return;
       }
 
+      console.log("=== VERIFYING PAYSTACK PAYMENT ===");
+      console.log("Reference:", transactionRef);
+
       try {
-        const response = await fetch("/api/ozow/confirm-payment", {
+        const response = await fetch("/api/paystack/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            transactionReference: transactionRef,
+            reference: transactionRef,
           }),
         });
 
         const data = await response.json();
+        console.log("Verify response:", data);
 
         if (data.success) {
           const userId = localStorage.getItem("current_user_id");
           const isAnonymousPayment = localStorage.getItem("is_anonymous_payment") === "true";
           
-          // Store plan name for display
           setPlanName(data.plan || localStorage.getItem("pending_payment_plan") || "Premium");
           
           if (userId) {
-            // Store subscription locally
             localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
             localStorage.setItem(`subscription_plan__${userId}`, data.plan);
             localStorage.setItem(`subscription_activated_at__${userId}`, new Date().toISOString());
           }
           
-          // Check if this was an anonymous payment
           if (isAnonymousPayment || (userId && userId.startsWith("anon_"))) {
-            // Anonymous user paid - they need to create an account
-            // Store the transaction reference so we can link it later
             localStorage.setItem("pending_subscription_transaction", transactionRef);
             setState("success_anonymous");
           } else {
-            // Signed-in user - subscription is fully activated
             setState("success");
           }
           
-          // Clean up pending payment data
           localStorage.removeItem("pending_payment_plan");
           localStorage.removeItem("pending_transaction_ref");
         } else if (data.status === "pending" && retryCount < 10) {
-          // Payment still processing, retry
           setTimeout(() => {
             setRetryCount(prev => prev + 1);
           }, 3000);
@@ -96,7 +83,6 @@ const PaymentSuccess = () => {
     verifyPayment();
   }, [searchParams, retryCount]);
 
-  // Verifying state - show loading spinner
   if (state === "verifying") {
     return (
       <div className="min-h-screen gradient-bg flex flex-col items-center justify-center px-6">
@@ -111,7 +97,6 @@ const PaymentSuccess = () => {
     );
   }
 
-  // Failed state - show error
   if (state === "failed") {
     return (
       <div className="min-h-screen gradient-bg flex flex-col items-center justify-center px-6">
@@ -141,7 +126,6 @@ const PaymentSuccess = () => {
     );
   }
 
-  // Success for ANONYMOUS users - prompt to create account
   if (state === "success_anonymous") {
     return (
       <div className="min-h-screen gradient-bg flex flex-col items-center justify-center px-6">
@@ -188,7 +172,6 @@ const PaymentSuccess = () => {
     );
   }
 
-  // Success for SIGNED-IN users - subscription fully activated
   return (
     <div className="min-h-screen gradient-bg flex flex-col items-center justify-center px-6">
       <div className="text-center max-w-md">

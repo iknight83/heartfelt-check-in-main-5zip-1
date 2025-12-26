@@ -4,7 +4,7 @@ import PaywallScreen from "@/components/PaywallScreen";
 import { useSubscription } from "@/hooks/useSubscription";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { ArrowLeft, Lock, Shield, ExternalLink } from "lucide-react";
+import { ArrowLeft, Lock, Shield, ExternalLink, CreditCard } from "lucide-react";
 
 type PaidPlanType = "lifetime" | "annual" | "monthly";
 
@@ -38,16 +38,16 @@ const Paywall = () => {
     return userId;
   };
 
-  const initiateOzowPayment = async (plan: PaidPlanType) => {
+  const initiatePaystackPayment = async (plan: PaidPlanType) => {
     try {
       setIsProcessing(true);
       
       const userId = getOrCreateTempUserId();
-      console.log("=== INITIATING OZOW PAYMENT ===");
+      console.log("=== PAYSTACK INITIATE ===");
       console.log("User ID:", userId);
       console.log("Plan:", plan);
 
-      const response = await fetch("/api/ozow/initiate", {
+      const response = await fetch("/api/paystack/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, plan }),
@@ -58,41 +58,17 @@ const Paywall = () => {
       const data = await response.json();
       console.log("API Response Data:", JSON.stringify(data, null, 2));
 
-      if (data.status === "ok" && data.paymentUrl && data.paymentData) {
-        console.log("=== PAYMENT DATA RECEIVED ===");
-        console.log("Payment URL:", data.paymentUrl);
-        console.log("Transaction Reference:", data.paymentData.TransactionReference);
-        console.log("Full payment data:", JSON.stringify(data.paymentData, null, 2));
+      if (data.status === "ok" && data.authorizationUrl) {
+        console.log("=== PAYSTACK REDIRECT ===");
+        console.log("Authorization URL:", data.authorizationUrl);
+        console.log("Reference:", data.reference);
         
         localStorage.setItem("pending_payment_plan", plan);
-        localStorage.setItem("pending_transaction_ref", data.paymentData.TransactionReference);
+        localStorage.setItem("pending_transaction_ref", data.reference);
         
-        const form = document.createElement("form");
-        form.method = "POST";
-        form.action = data.paymentUrl;
-        form.style.display = "none";
-        form.id = "ozow-payment-form";
-
-        console.log("=== CREATING FORM INPUTS ===");
-        Object.entries(data.paymentData).forEach(([key, value]) => {
-          const input = document.createElement("input");
-          input.type = "hidden";
-          input.name = key;
-          input.value = String(value);
-          form.appendChild(input);
-          console.log(`  Field: ${key} = ${String(value).substring(0, 50)}${String(value).length > 50 ? '...' : ''}`);
-        });
-
-        document.body.appendChild(form);
-        
-        console.log("=== OZOW FORM SUBMITTING NOW ===");
-        console.log("Form action:", form.action);
-        console.log("Form method:", form.method);
-        console.log("Form element count:", form.elements.length);
-        
-        form.submit();
+        window.location.href = data.authorizationUrl;
       } else {
-        console.error("=== OZOW INITIATION FAILED ===");
+        console.error("=== PAYSTACK INITIATION FAILED ===");
         console.error("Response data:", data);
         const errorMsg = data.message || data.error || "Failed to initiate payment";
         toast.error(errorMsg);
@@ -118,7 +94,7 @@ const Paywall = () => {
 
   const handleConfirmPayment = () => {
     if (confirmingPlan) {
-      initiateOzowPayment(confirmingPlan);
+      initiatePaystackPayment(confirmingPlan);
     }
   };
 
@@ -136,7 +112,7 @@ const Paywall = () => {
     try {
       setIsProcessing(true);
       
-      const response = await fetch(`/api/ozow/subscription/${userId}`);
+      const response = await fetch(`/api/paystack/subscription/${userId}`);
       const data = await response.json();
 
       if (data.hasSubscription) {
@@ -205,21 +181,21 @@ const Paywall = () => {
           <div className="w-full mb-6">
             <div className="flex items-center gap-2 mb-3">
               <Shield className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm font-medium text-foreground">Secure Ozow Payment</span>
+              <span className="text-sm font-medium text-foreground">Secure Paystack Payment</span>
             </div>
             
-            <div className="relative rounded-xl overflow-hidden border border-border/30 bg-white">
-              <img 
-                src="/ozow-preview.png" 
-                alt="Ozow secure payment preview" 
-                className="w-full h-auto opacity-90"
-                style={{ maxHeight: "200px", objectFit: "cover", objectPosition: "top" }}
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-background/80 to-transparent" />
-              <div className="absolute bottom-3 left-3 right-3 flex items-center gap-2">
-                <Lock className="w-4 h-4 text-emerald-400" />
-                <span className="text-xs text-foreground/80">
-                  You'll be redirected to Ozow to complete payment securely
+            <div className="relative rounded-xl overflow-hidden border border-border/30 bg-gradient-to-br from-blue-600 to-blue-800 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <CreditCard className="w-8 h-8 text-white" />
+                <div>
+                  <p className="text-white font-semibold">Paystack</p>
+                  <p className="text-blue-200 text-sm">Secure Payment Gateway</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Lock className="w-4 h-4 text-emerald-300" />
+                <span className="text-sm text-blue-100">
+                  Your payment is protected by bank-level security
                 </span>
               </div>
             </div>
@@ -230,11 +206,11 @@ const Paywall = () => {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
                 <ExternalLink className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
-                <span>You'll be redirected to Ozow to complete payment</span>
+                <span>You'll be redirected to Paystack to complete payment</span>
               </li>
               <li className="flex items-start gap-2">
                 <Shield className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
-                <span>We don't store your payment details</span>
+                <span>We don't store your card details</span>
               </li>
               {isAnonymous && (
                 <li className="flex items-start gap-2">
