@@ -1,0 +1,130 @@
+🔧 WHAT MUST BE CONFIGURED (VERY IMPORTANT)
+A) In Your Code (Already Mostly Done)
+Backend – Initialize Transaction
+
+Must include:
+
+callback_url: "https://YOUR-PRODUCTION-DOMAIN/payment/success"
+
+
+✅ This is already correct in your implementation.
+
+Frontend – Redirect
+
+Must be:
+
+window.location.href = authorization_url;
+
+
+❗ Not a popup
+❗ Not a modal
+❗ Not an iframe
+
+This is the #1 reason Paystack “just closes”.
+
+Payment Success Page
+
+/payment/success should:
+
+Show “Verifying your payment…”
+
+Call backend:
+
+GET /api/me/subscription
+
+
+If active:
+
+Unlock features
+
+Redirect to dashboard
+
+B) In Paystack Dashboard (THIS IS WHAT’S MISSING)
+
+This cannot be fixed in code alone.
+
+🔴 REQUIRED: Webhook URL
+
+Go to:
+
+Paystack Dashboard → Settings → API Keys & Webhooks
+
+Set:
+
+Webhook URL:
+https://YOUR-PRODUCTION-DOMAIN/api/paystack/webhook
+
+
+Example (Replit):
+
+https://heartfelt-check-in-main-5-zip-1--knightleeron1.replit.app/api/paystack/webhook
+
+
+Click Save.
+
+Why this matters
+
+Without webhook:
+
+Payment succeeds
+
+Paystack closes
+
+Your app never gets confirmation
+
+Subscription never activates
+
+This is exactly what you’re seeing now.
+
+✅ WHY PAYSTACK IS CLOSING WITHOUT REDIRECTING
+
+One (or more) of these is true:
+
+Cause	Result
+Checkout opened as popup	Tab closes
+callback_url not absolute	No redirect
+Mixed test/live domains	Redirect ignored
+Browser popup blocker	Redirect blocked
+Webhook not configured	Features never unlock
+
+None of these mean your app is broken.
+
+✅ FINAL CHECKLIST (DO THIS IN ORDER)
+1️⃣ Confirm frontend uses full redirect
+window.location.href = authorization_url;
+
+2️⃣ Confirm callback_url is absolute
+https://YOUR-DOMAIN/payment/success
+
+3️⃣ Set webhook URL in Paystack dashboard
+
+This is mandatory
+
+4️⃣ Republish Replit app
+5️⃣ Test again using test card
+
+Paystack test card:
+
+Card: 4084 0840 8408 4081
+Expiry: any future date
+CVV: 408
+OTP: 123456
+
+🟢 WHAT “WORKING” LOOKS LIKE
+
+✔ Redirects to Paystack
+✔ Payment completes
+✔ Returns to /payment/success
+✔ Page shows “Verifying payment…”
+✔ Subscription unlocks
+✔ Features become available
+
+🧠 FINAL REASSURANCE
+
+Yes — Paystack is usually easier than Ozow
+
+Yes — this is normal for first-time setup
+
+No — your code is not fundamentally broken
+
+You are one dashboard setting away from success
