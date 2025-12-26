@@ -506,6 +506,25 @@ router.post("/claim", async (req, res) => {
     const payment = paymentResult.rows[0];
     const plan = payment.plan as PlanType;
 
+    // Prevent double-claiming: only allow claiming if payment is still anonymous
+    if (!payment.is_anonymous) {
+      console.log(`Payment already claimed by user: ${payment.user_id}`);
+      
+      // If already claimed by this same user, return success (idempotent)
+      if (payment.user_id === newUserId) {
+        return res.json({
+          success: true,
+          plan,
+          message: "Subscription already claimed by this user"
+        });
+      }
+      
+      return res.status(400).json({
+        success: false,
+        message: "This payment has already been claimed"
+      });
+    }
+
     await pool.query(
       `UPDATE payments SET user_id = $1, is_anonymous = false, updated_at = NOW() 
        WHERE transaction_reference = $2`,
