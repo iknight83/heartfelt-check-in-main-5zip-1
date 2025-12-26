@@ -26,29 +26,19 @@ Preferred communication style: Simple, everyday language.
 ### Authentication Flow
 - **Provider**: Supabase Auth (email/password and anonymous authentication)
 - **Anonymous Mode**: Users can use the app without an account; data persists only for the current session
-- **Onboarding Gate**: New users complete a multi-step onboarding flow (emotions → duration → support → factors → paywall → reminder → auth) before accessing the main app
-- **Signup at End**: Auth/signup happens at the END of onboarding, after payment selection
+- **Onboarding Gate**: New users complete a multi-step onboarding flow (emotions → duration → support → factors → **auth → paywall** → reminder) before accessing the main app
+- **Auth Before Payment**: Users must authenticate BEFORE selecting a payment plan (simplified Dec 2025)
 - **Completion Tracking**: `termsAcceptedAt` timestamp stored per-user indicates onboarding completion
 
-### Anonymous Payment Flow (Dec 2025)
-Anonymous users can pay BEFORE signing up:
+### Payment Flow (Updated Dec 2025)
+All payments require authenticated users - no anonymous payments:
 
-1. **Payment Before Signup**:
-   - Anonymous user selects plan on paywall
-   - Backend generates temporary user ID (`anon_<timestamp>_<random>`)
-   - Payment stored with `is_anonymous = true`
-   - User redirects to Paystack, pays, returns to app
-
-2. **Claim After Signup**:
-   - After payment success, user continues to reminder → auth steps
-   - At signup, frontend calls `/api/paystack/claim` with transaction reference
-   - Backend transfers subscription from temp ID to real user ID
-   - Subscription activated for the signed-in user
-
-3. **localStorage Keys Used**:
-   - `pending_transaction_ref`: Transaction reference for claiming
-   - `pending_payment_plan`: Selected plan type
-   - `pending_anon_user_id`: Temporary user ID from backend
+1. **Auth-First Payment**:
+   - User completes onboarding steps up to authentication
+   - User signs in/up with email or anonymously (gets real Supabase user ID)
+   - User then selects a subscription plan on paywall
+   - Backend requires authenticated userId for all payment initiation
+   - No claim logic needed - subscription is directly linked to real user ID
 
 ### Key Data Models
 - **MoodEntry**: Contains mood label, triggers, timestamp, notes, and unique ID
