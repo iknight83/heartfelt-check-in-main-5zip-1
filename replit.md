@@ -84,6 +84,13 @@ The app uses Paystack for South African payment processing with a secure server-
    - Verify subscription activated: Check `subscriptions` table in database
    - Test restore: Click "Restore purchases" on paywall to sync from server
 
+8. **Subscription Sync on Login** (Dec 2025):
+   - Every login triggers `syncSubscriptionFromBackend()` to check backend status
+   - Runs on `SIGNED_IN` and `TOKEN_REFRESHED` auth events
+   - Also runs on `getSession()` for returning users with existing sessions
+   - Prevents reliance on potentially stale localStorage cache
+   - Ensures expired subscriptions are immediately reflected on the frontend
+
 ### Data Persistence Implementation (Fixed Dec 2025)
 The app now uses a robust data migration pattern:
 

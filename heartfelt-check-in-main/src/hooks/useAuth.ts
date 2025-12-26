@@ -1,6 +1,30 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
+
+const syncSubscriptionFromBackend = async (userId: string) => {
+  try {
+    const response = await fetch(`/api/paystack/subscription/${userId}`);
+    if (!response.ok) return;
+    
+    const data = await response.json();
+    const subscriptionKey = `deeper_insights_subscribed__${userId}`;
+    const planKey = `subscription_plan__${userId}`;
+    const expiresKey = `subscription_expires_at__${userId}`;
+    const lifetimeKey = `subscription_is_lifetime__${userId}`;
+
+    if (data.hasSubscription) {
+      localStorage.setItem(subscriptionKey, "true");
+      if (data.plan) localStorage.setItem(planKey, data.plan);
+      if (data.expiresAt) localStorage.setItem(expiresKey, data.expiresAt);
+      localStorage.setItem(lifetimeKey, data.isLifetime ? "true" : "false");
+    } else if (data.status === "expired") {
+      localStorage.setItem(subscriptionKey, "false");
+    }
+  } catch (error) {
+    console.error("Failed to sync subscription on login:", error);
+  }
+};
 
 // Migrate pending onboarding data to user-scoped keys
 const migratePendingDataToUser = (userId: string) => {
@@ -55,7 +79,7 @@ export const useAuth = () => {
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
+      async (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -64,6 +88,10 @@ export const useAuth = () => {
           localStorage.setItem("current_user_id", session.user.id);
           // Migrate any pending data from before auth
           migratePendingDataToUser(session.user.id);
+          // Sync subscription status from backend on login
+          if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+            await syncSubscriptionFromBackend(session.user.id);
+          }
         } else {
           localStorage.removeItem("current_user_id");
         }
@@ -73,7 +101,7 @@ export const useAuth = () => {
     );
 
     // THEN check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(async ({ data: { session } }) => {
       setSession(session);
       setUser(session?.user ?? null);
       
@@ -82,6 +110,8 @@ export const useAuth = () => {
         localStorage.setItem("current_user_id", session.user.id);
         // Migrate any pending/legacy data to user-scoped keys
         migratePendingDataToUser(session.user.id);
+        // Sync subscription status from backend for returning users
+        await syncSubscriptionFromBackend(session.user.id);
       } else {
         localStorage.removeItem("current_user_id");
       }
