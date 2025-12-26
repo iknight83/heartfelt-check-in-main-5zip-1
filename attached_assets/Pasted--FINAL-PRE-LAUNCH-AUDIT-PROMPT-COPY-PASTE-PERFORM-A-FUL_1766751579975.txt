@@ -1,0 +1,100 @@
+✅ FINAL PRE-LAUNCH AUDIT PROMPT (COPY–PASTE)
+PERFORM A FULL AUTH + ONBOARDING + PAYMENT FLOW AUDIT.
+
+DO NOT ADD NEW FEATURES.
+DO NOT CHANGE BUSINESS LOGIC.
+ONLY VERIFY, SIMPLIFY, AND FIX ISSUES.
+
+GOAL:
+Ensure there are NO unnecessary sign-up prompts, NO dead flows, and NO incorrect redirects
+across anonymous users, first-time users, and existing users.
+
+REQUIRED REVIEW PERSPECTIVES:
+
+1. ANONYMOUS USER (NOT LOGGED IN)
+- Can complete onboarding steps without being forced to sign up early
+- Can choose Free Trial without sign-up until the end
+- Can choose Monthly / Annual / Lifetime and go directly to Paystack
+- After payment, continues onboarding
+- Signup happens ONLY at the final step
+- No duplicate or confusing signup prompts
+
+2. ANONYMOUS USER WHO PAID
+- Payment is stored safely and survives refresh
+- User can close browser and still claim payment later
+- On signup, subscription is claimed exactly once
+- No way to lose or double-claim payment
+
+3. FIRST-TIME SIGNED-IN USER (NO DATA)
+- Sees onboarding once
+- Pricing behaves correctly
+- Paid plans redirect to Paystack
+- Free trial behaves correctly
+- Ends at Journal
+
+4. EXISTING SIGNED-IN USER (HAS DATA)
+- NEVER sees onboarding again
+- NEVER sees pricing again
+- Goes directly to Journal
+- If subscription expired, ONLY Deeper Insights are locked
+
+5. SUBSCRIPTION ENFORCEMENT
+- Backend is the only source of truth
+- Frontend never unlocks premium content without backend confirmation
+- Lifetime never expires
+- Annual expires after 365 days
+- Monthly expires after 30 days
+- Expired users are locked immediately
+
+6. UX CHECKS
+- No dead buttons
+- No silent failures
+- No forced login when not required
+- Clear user feedback at each step
+- No duplicate redirects
+
+OUTPUT REQUIRED:
+- List ANY unnecessary sign-up prompts
+- List ANY redundant auth checks
+- List ANY edge cases that could confuse users
+- Confirm if the system is production-ready or list exact fixes
+
+THIS IS A REVIEW + CLEANUP TASK ONLY.
+
+🧠 Why this prompt works
+
+It forces Replit to think in user perspectives
+
+It prevents it from “rewriting” working logic
+
+It catches:
+
+Extra sign-up screens
+
+Accidental auth gates
+
+UX regressions
+
+It produces a yes/no readiness answer
+
+✅ When Replit replies, look for this
+
+A good response will say things like:
+
+“No unnecessary signup prompts found”
+
+“Auth is deferred correctly”
+
+“Existing users skip onboarding”
+
+“No dead flows detected”
+
+A bad response will:
+
+Propose new logic
+
+Suggest moving signup earlier
+
+Rewrite payment code unnecessarily
+
+If it does the latter → stop and show me the reply.
