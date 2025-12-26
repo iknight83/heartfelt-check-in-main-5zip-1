@@ -63,6 +63,7 @@ The app uses Paystack for South African payment processing with a secure server-
 2. **Database Tables** (PostgreSQL):
    - `payments`: transaction_reference (unique), user_id, plan, amount, status, verified_at
    - `subscriptions`: user_id (unique), plan, is_active, activated_at, expires_at, payment_id
+   - `trials`: user_id (unique), started_at, expires_at (started_at + 7 days), is_active
 
 3. **Subscription Expiry Logic** (Dec 2025):
    - Lifetime subscriptions: expires_at = null (never expire)
@@ -86,7 +87,8 @@ The app uses Paystack for South African payment processing with a secure server-
    - `POST /api/paystack/initiate` - Creates payment and returns Paystack authorization URL
    - `POST /api/paystack/webhook` - Receives Paystack webhooks (signature-verified)
    - `POST /api/paystack/verify` - Verifies payment status with Paystack API
-   - `GET /api/paystack/subscription/:userId` - Check user's active subscription
+   - `GET /api/paystack/subscription/:userId` - Check user's active subscription and trial status
+   - `POST /api/paystack/trial/start` - Start a 7-day free trial for a user
 
 7. **Testing Paystack Payments**:
    - Use Paystack test secret key (starts with sk_test_)
@@ -118,11 +120,12 @@ The app now uses a robust data migration pattern:
 Existing users with active subscriptions or trials skip onboarding automatically:
 
 1. **Access Check on Index**: Index.tsx checks both `termsAcceptedAt` AND subscription/trial status
-2. **Subscription Hook Reactivity**: `useSubscription` polls for user ID changes and refreshes subscription status
-3. **Backend as Source of Truth**: Subscription check calls backend `/api/paystack/subscription/:userId`
-4. **Trial = Active Access**: Users on active free trial are treated as having access
-5. **Auto-Complete Onboarding**: If user has active access but no termsAcceptedAt, it's set automatically
-6. **Redirect to Journal**: Users with active subscription OR active trial go directly to /home
+2. **Subscription Hook Reactivity**: `useSubscription` accepts userId parameter and refreshes subscription status
+3. **Backend as Source of Truth**: Subscription/trial check calls backend `/api/paystack/subscription/:userId`
+4. **Trial = Active Access**: Users on active free trial are treated as having access (backend returns `hasActiveAccess=true`)
+5. **No Auto-Trial Creation**: Trials are only created when user explicitly starts one via paywall; no client-side fallback
+6. **Auto-Complete Onboarding**: If user has active access but no termsAcceptedAt, it's set automatically
+7. **Redirect to Journal**: Users with active subscription OR active trial go directly to /home
 
 ## External Dependencies
 
