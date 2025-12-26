@@ -1,0 +1,64 @@
+I want to REMOVE Ozow completely from my app and REPLACE it with Paystack.
+
+Context:
+- This is a React + Node.js + Express app
+- Ozow integration exists but should be fully removed
+- Paystack will be the ONLY payment provider going forward
+- App supports Free Trial and Paid Subscriptions
+
+TASKS:
+
+1. REMOVE OZOW
+- Delete all Ozow-related backend routes:
+  /api/ozow/initiate
+  /api/ozow/notify
+- Remove all Ozow utility files, hash logic, and helpers
+- Remove Ozow environment variables
+- Remove Ozow frontend payment logic and redirects
+- Ensure no references to Ozow remain in the codebase
+
+2. ADD PAYSTACK (BACKEND)
+- Create POST /api/paystack/initiate
+  - Accept: amount, email (or temp email for anonymous), plan, userId or anonymousId
+  - Initialize a Paystack transaction using the Paystack API
+  - Return authorization_url to frontend
+
+- Create POST /api/paystack/webhook
+  - Verify x-paystack-signature using PAYSTACK_SECRET_KEY
+  - Handle charge.success event
+  - Activate the user’s subscription in the database
+  - Store: reference, amount, plan, userId / anonymousId
+  - Respond with HTTP 200
+
+3. ADD PAYSTACK (FRONTEND)
+- When a PAID plan is selected:
+  - Call /api/paystack/initiate
+  - Redirect user to authorization_url
+- When FREE TRIAL is selected:
+  - Skip payment and allow access immediately
+
+4. ENVIRONMENT VARIABLES
+Use these ONLY:
+- PAYSTACK_PUBLIC_KEY
+- PAYSTACK_SECRET_KEY
+
+5. SECURITY & BEST PRACTICE
+- Never expose secret key to frontend
+- Always verify webhook signature
+- Add clear console logs:
+  - PAYSTACK INITIATE
+  - PAYSTACK REDIRECT
+  - PAYSTACK WEBHOOK RECEIVED
+  - SUBSCRIPTION ACTIVATED
+
+6. CLEANUP
+- Ensure Profile page correctly reflects subscription status
+- Hide payment options when subscription is active
+- Ensure anonymous users can pay and are prompted to create an account after payment
+
+GOAL:
+A clean Paystack-only payment system with:
+- Free Trial flow
+- Paid subscription flow
+- Webhook-confirmed activation
+- No Ozow code remaining
