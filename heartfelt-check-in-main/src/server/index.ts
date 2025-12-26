@@ -12,6 +12,9 @@ const isProduction = process.env.NODE_ENV === "production";
 const PORT = parseInt(process.env.PORT || "5000", 10);
 
 app.use(cors());
+
+app.use("/api/paystack/webhook", express.raw({ type: "application/json" }));
+
 app.use(express.json());
 
 app.use("/api/paystack", paystackRouter);

@@ -172,9 +172,11 @@ router.post("/webhook", async (req, res) => {
       return res.sendStatus(500);
     }
 
+    const rawBody = Buffer.isBuffer(req.body) ? req.body : Buffer.from(JSON.stringify(req.body));
+
     const hash = crypto
       .createHmac("sha512", PAYSTACK_SECRET_KEY)
-      .update(JSON.stringify(req.body))
+      .update(rawBody)
       .digest("hex");
 
     if (hash !== signature) {
@@ -183,10 +185,13 @@ router.post("/webhook", async (req, res) => {
     }
 
     console.log("Signature verified successfully");
-    console.log("Event:", req.body.event);
-    console.log("Data:", JSON.stringify(req.body.data, null, 2));
 
-    const { event, data } = req.body;
+    const payload = Buffer.isBuffer(req.body) ? JSON.parse(req.body.toString()) : req.body;
+    
+    console.log("Event:", payload.event);
+    console.log("Data:", JSON.stringify(payload.data, null, 2));
+
+    const { event, data } = payload;
 
     if (event === "charge.success") {
       const { reference, amount, metadata } = data;
