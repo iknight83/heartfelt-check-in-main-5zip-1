@@ -1,0 +1,128 @@
+✅ What “Authentication Failed” means (Paystack)
+
+This message comes from the bank / card issuer, not from your app and not from Paystack logic.
+
+It means the card could not be authenticated, usually because of 3-D Secure / OTP / bank rules.
+
+Common reasons (especially on phones)
+
+❌ Card not enabled for online payments
+
+❌ Card blocked for 3-D Secure
+
+❌ Bank requires OTP / in-app approval but it didn’t complete
+
+❌ Test card used on live environment (or vice-versa)
+
+❌ Insufficient funds / daily limit
+
+❌ Bank simply declined it (very common)
+
+👉 This is normal during testing.
+
+🔴 Important question (very likely the cause)
+Are you using:
+
+TEST keys (sk_test_...)
+OR
+
+LIVE keys (sk_live_...)?
+
+If you are using TEST keys
+
+❌ Real cards will fail
+
+✅ You must use Paystack test cards
+
+If you are using LIVE keys
+
+❌ Some cards will still fail due to bank rules
+
+✅ EFT / Scan to Pay often works better in SA
+
+✅ What to do RIGHT NOW (fastest path)
+OPTION A — Test properly (recommended now)
+
+Use Paystack test card:
+
+Card Number: 4084 0840 8408 4081
+Expiry: 12/30
+CVV: 408
+OTP: 123456
+
+
+This will succeed if:
+
+You are on test keys
+
+Your integration is correct (which it is — you reached checkout)
+
+OPTION B — Use Scan to Pay / SnapScan (real-world testing)
+
+On your phone:
+
+Tap Scan to Pay
+
+Or SnapScan
+
+These often succeed even when cards fail
+
+This is very common in South Africa.
+
+🧠 Key takeaway (this is important)
+
+❗ Authentication Failed ≠ Integration broken
+
+Your app is doing everything right:
+
+✅ Redirect works
+
+✅ Paystack checkout loads
+
+✅ Amount + reference correct
+
+✅ Payment attempt reaches Paystack
+
+The failure is purely payment-method level.
+
+🔍 How to confirm everything is correct (developer check)
+
+After a failed attempt:
+
+Go to Paystack Dashboard
+
+Open Transactions
+
+You should see:
+
+Status: failed
+
+Reason: authentication_failed
+
+If you see it there → your backend + frontend are 100% correct.
+
+✅ What success will look like
+
+When a payment does succeed:
+
+Paystack closes
+
+Redirects to /payment/success
+
+Your app shows “Verifying payment…”
+
+Webhook fires
+
+Subscription unlocks
+
+You are one successful payment away from full confirmation.
+
+💬 Honest reassurance
+
+Yes — this is very normal
+
+No — you didn’t break anything
+
+Paystack + mobile cards in SA = lots of declines
+
+Scan to Pay usually works first try
