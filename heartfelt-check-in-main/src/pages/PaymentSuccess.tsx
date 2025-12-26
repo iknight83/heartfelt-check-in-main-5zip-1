@@ -40,25 +40,25 @@ const PaymentSuccess = () => {
 
         if (data.success) {
           const userId = localStorage.getItem("current_user_id");
-          const isAnonymousPayment = localStorage.getItem("is_anonymous_payment") === "true";
+          const pendingAnonUserId = localStorage.getItem("pending_anon_user_id");
+          const isAnonymousPayment = !!pendingAnonUserId || (userId && userId.startsWith("anon_"));
           
           setPlanName(data.plan || localStorage.getItem("pending_payment_plan") || "Premium");
           
-          if (userId) {
+          if (userId && !isAnonymousPayment) {
             localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
             localStorage.setItem(`subscription_plan__${userId}`, data.plan);
             localStorage.setItem(`subscription_activated_at__${userId}`, new Date().toISOString());
           }
           
-          if (isAnonymousPayment || (userId && userId.startsWith("anon_"))) {
-            localStorage.setItem("pending_subscription_transaction", transactionRef);
+          if (isAnonymousPayment) {
             setState("success_anonymous");
           } else {
+            localStorage.removeItem("pending_payment_plan");
+            localStorage.removeItem("pending_transaction_ref");
+            localStorage.removeItem("pending_anon_user_id");
             setState("success");
           }
-          
-          localStorage.removeItem("pending_payment_plan");
-          localStorage.removeItem("pending_transaction_ref");
         } else if (data.status === "pending" && retryCount < 10) {
           setTimeout(() => {
             setRetryCount(prev => prev + 1);
