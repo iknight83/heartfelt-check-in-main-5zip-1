@@ -37,48 +37,44 @@ Preferred communication style: Simple, everyday language.
 ### Subscription System
 - **Trial Period**: 7-day free trial from first visit
 - **Plans**: Monthly (R49), Annual (R349), Lifetime (R999) subscription tiers
-- **Payment Provider**: Ozow (South African payment gateway)
+- **Payment Provider**: Paystack (South African payment gateway)
 - **Feature Gating**: Confidence levels for insights are restricted based on subscription status
 
-### Ozow Payment Integration (Dec 2025)
-The app uses Ozow for South African payment processing with a secure server-side implementation:
+### Paystack Payment Integration (Dec 2025)
+The app uses Paystack for South African payment processing with a secure server-side implementation:
 
 1. **Security Model**:
-   - Server generates all transaction references (no client-supplied identifiers)
-   - Server controls pricing via PLAN_PRICES constant
-   - Mandatory SHA512 hash verification on all Ozow callbacks
-   - Rejects callbacks without valid signatures (403 response)
-   - Rejects callbacks for unknown transactions (404 response)
+   - Server generates all transaction references (format: HFCHK-<timestamp>-<random>)
+   - Server controls pricing via PLAN_PRICES constant (stored in kobo: 100 kobo = R1)
+   - Mandatory HMAC SHA512 signature verification on all Paystack webhooks
+   - Rejects webhooks without valid signatures (400 response)
 
 2. **Database Tables** (PostgreSQL):
-   - `payments`: transaction_reference (unique), user_id, plan, amount, status, ozow_transaction_id, verified_at
+   - `payments`: transaction_reference (unique), user_id, plan, amount, status, verified_at
    - `subscriptions`: user_id (unique), plan, is_active, activated_at, payment_id
 
 3. **Payment Flow**:
-   - Client calls `/api/ozow/initiate` with userId and plan only
-   - Server creates payment record with server-generated reference and pricing
-   - Client redirects to Ozow via form POST
-   - Ozow calls `/api/ozow/notify` with signed callback
-   - Server verifies hash BEFORE any state changes
+   - Client calls `/api/paystack/initiate` with userId and plan only
+   - Server creates payment record and calls Paystack API to initialize transaction
+   - Client redirects to Paystack's authorization_url (simple redirect, no form POST)
+   - Paystack calls `/api/paystack/webhook` with signed callback
+   - Server verifies HMAC signature BEFORE any state changes
    - Server updates payment status and activates subscription
-   - Client polls `/api/ozow/confirm-payment` with retry logic
+   - Client returns to callback_url and verifies payment via `/api/paystack/verify`
 
 4. **Environment Variables Required**:
-   - `OZOW_SITE_CODE`: Merchant site code
-   - `OZOW_API_KEY`: API key for authentication
-   - `OZOW_PRIVATE_KEY`: Private key for hash verification
+   - `PAYSTACK_SECRET_KEY`: Secret key from Paystack dashboard (starts with sk_)
 
 5. **API Endpoints**:
-   - `POST /api/ozow/initiate` - Creates payment and returns Ozow form data
-   - `POST /api/ozow/notify` - Receives Ozow callbacks (hash-verified)
-   - `POST /api/ozow/confirm-payment` - Frontend polls for payment status
-   - `GET /api/ozow/subscription/:userId` - Check user's active subscription
-   - `GET /api/ozow/verify/:transactionReference` - Verify payment status
+   - `POST /api/paystack/initiate` - Creates payment and returns Paystack authorization URL
+   - `POST /api/paystack/webhook` - Receives Paystack webhooks (signature-verified)
+   - `POST /api/paystack/verify` - Verifies payment status with Paystack API
+   - `GET /api/paystack/subscription/:userId` - Check user's active subscription
 
-6. **Testing Ozow Payments**:
-   - Enable test mode: `IsTest: true` in payment data (automatic in dev)
-   - Use Ozow test credentials from your Ozow dashboard
-   - Test flow: Paywall → Select plan → Ozow checkout → Success/Cancel/Error page
+6. **Testing Paystack Payments**:
+   - Use Paystack test secret key (starts with sk_test_)
+   - Test cards available in Paystack documentation
+   - Test flow: Paywall → Select plan → Paystack checkout → Success page
    - Verify subscription activated: Check `subscriptions` table in database
    - Test restore: Click "Restore purchases" on paywall to sync from server
 
