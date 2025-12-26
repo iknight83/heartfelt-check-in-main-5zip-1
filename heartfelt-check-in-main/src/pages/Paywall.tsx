@@ -26,23 +26,24 @@ const Paywall = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmingPlan, setConfirmingPlan] = useState<PaidPlanType | null>(null);
 
-  const getOrCreateTempUserId = (): string => {
-    let userId = localStorage.getItem("current_user_id");
-    
-    if (!userId) {
-      userId = `anon_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-      localStorage.setItem("current_user_id", userId);
-      localStorage.setItem("is_anonymous_payment", "true");
-    }
-    
-    return userId;
+  const getUserId = (): string | null => {
+    return localStorage.getItem("current_user_id");
   };
 
   const initiatePaystackPayment = async (plan: PaidPlanType) => {
     try {
       setIsProcessing(true);
       
-      const userId = getOrCreateTempUserId();
+      const userId = getUserId();
+      
+      if (!userId) {
+        toast.error("Please sign in to make a purchase");
+        setIsProcessing(false);
+        setConfirmingPlan(null);
+        navigate("/");
+        return;
+      }
+      
       console.log("=== PAYSTACK INITIATE ===");
       console.log("User ID:", userId);
       console.log("Plan:", plan);
@@ -143,8 +144,6 @@ const Paywall = () => {
 
   if (confirmingPlan) {
     const planDetails = PLAN_DETAILS[confirmingPlan];
-    const isAnonymous = !localStorage.getItem("current_user_id") || 
-                        localStorage.getItem("current_user_id")?.startsWith("anon_");
 
     return (
       <div className="min-h-screen gradient-bg flex flex-col px-6 py-8">
@@ -212,14 +211,6 @@ const Paywall = () => {
                 <Shield className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
                 <span>We don't store your card details</span>
               </li>
-              {isAnonymous && (
-                <li className="flex items-start gap-2">
-                  <Lock className="w-4 h-4 mt-0.5 flex-shrink-0 text-amber-400" />
-                  <span className="text-amber-200/80">
-                    After payment, you'll be asked to create an account to activate your subscription
-                  </span>
-                </li>
-              )}
             </ul>
           </div>
 

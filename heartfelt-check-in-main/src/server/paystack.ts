@@ -20,10 +20,9 @@ const VALID_PLANS = ["monthly", "annual", "lifetime"] as const;
 type PlanType = "monthly" | "annual" | "lifetime";
 
 interface InitiatePaymentRequest {
-  userId?: string;
+  userId: string;
   plan: PlanType;
   email?: string;
-  isAnonymous?: boolean;
 }
 
 interface SubscriptionAccess {
@@ -174,16 +173,14 @@ router.post("/initiate", async (req, res) => {
       });
     }
 
-    const { userId, plan, email, isAnonymous } = req.body as InitiatePaymentRequest;
+    const { userId, plan, email } = req.body as InitiatePaymentRequest;
 
-    if (!plan) {
+    if (!userId || !plan) {
       return res.status(400).json({
         error: "Missing required fields",
-        message: "plan is required"
+        message: "userId and plan are required"
       });
     }
-
-    const effectiveUserId = userId || `anon_${Date.now()}_${crypto.randomBytes(4).toString("hex")}`;
 
     if (!VALID_PLANS.includes(plan as typeof VALID_PLANS[number])) {
       return res.status(400).json({
@@ -201,8 +198,7 @@ router.post("/initiate", async (req, res) => {
     }
 
     const reference = generateReference();
-    const customerEmail = email || `${effectiveUserId}@heartfelt-temp.com`;
-    const isAnonymousPayment = isAnonymous || !userId || effectiveUserId.startsWith("anon_");
+    const customerEmail = email || `${userId}@heartfelt-user.com`;
 
     const baseUrl = process.env.REPLIT_DEPLOYMENT_URL 
       ? `https://${process.env.REPLIT_DEPLOYMENT_URL}`
@@ -215,8 +211,8 @@ router.post("/initiate", async (req, res) => {
     console.log("Base URL:", baseUrl);
     console.log("Callback URL:", callbackUrl);
     console.log("Reference:", reference);
+    console.log("User ID:", userId);
     console.log("Amount (kobo):", amount);
-    console.log("Is Anonymous Payment:", isAnonymousPayment);
 
     await pool.query(
       `INSERT INTO payments (transaction_reference, user_id, plan, amount, status, is_anonymous)
@@ -229,7 +225,7 @@ router.post("/initiate", async (req, res) => {
          is_anonymous = EXCLUDED.is_anonymous,
          updated_at = NOW()
        RETURNING id`,
-      [reference, effectiveUserId, plan, amount / 100, "pending", isAnonymousPayment]
+      [reference, userId, plan, amount / 100, "pending", false]
     );
 
     const paystackResponse = await fetch("https://api.paystack.co/transaction/initialize", {
@@ -244,9 +240,8 @@ router.post("/initiate", async (req, res) => {
         reference: reference,
         callback_url: callbackUrl,
         metadata: {
-          userId: effectiveUserId,
+          userId: userId,
           plan,
-          isAnonymous: isAnonymousPayment,
           custom_fields: [
             {
               display_name: "Plan",
@@ -256,12 +251,7 @@ router.post("/initiate", async (req, res) => {
             {
               display_name: "User ID",
               variable_name: "user_id",
-              value: effectiveUserId
-            },
-            {
-              display_name: "Anonymous",
-              variable_name: "is_anonymous",
-              value: isAnonymousPayment ? "Yes" : "No"
+              value: userId
             }
           ]
         }
@@ -287,8 +277,6 @@ router.post("/initiate", async (req, res) => {
       authorizationUrl: paystackData.data.authorization_url,
       reference: paystackData.data.reference,
       accessCode: paystackData.data.access_code,
-      userId: effectiveUserId,
-      isAnonymous: isAnonymousPayment,
     });
   } catch (error) {
     console.error("Paystack initiate error:", error);
@@ -472,79 +460,6 @@ router.get("/subscription/:userId", async (req, res) => {
       hasSubscription: false,
       status: "none",
       message: "Failed to check subscription"
-    });
-  }
-});
-
-router.post("/claim", async (req, res) => {
-  try {
-    const { reference, newUserId } = req.body;
-
-    if (!reference || !newUserId) {
-      return res.status(400).json({
-        success: false,
-        message: "reference and newUserId are required"
-      });
-    }
-
-    console.log(`=== CLAIMING SUBSCRIPTION ===`);
-    console.log(`Reference: ${reference}`);
-    console.log(`New User ID: ${newUserId}`);
-
-    const paymentResult = await pool.query(
-      `SELECT * FROM payments WHERE transaction_reference = $1 AND status = 'complete'`,
-      [reference]
-    );
-
-    if (paymentResult.rows.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: "No completed payment found with this reference"
-      });
-    }
-
-    const payment = paymentResult.rows[0];
-    const plan = payment.plan as PlanType;
-
-    // Prevent double-claiming: only allow claiming if payment is still anonymous
-    if (!payment.is_anonymous) {
-      console.log(`Payment already claimed by user: ${payment.user_id}`);
-      
-      // If already claimed by this same user, return success (idempotent)
-      if (payment.user_id === newUserId) {
-        return res.json({
-          success: true,
-          plan,
-          message: "Subscription already claimed by this user"
-        });
-      }
-      
-      return res.status(400).json({
-        success: false,
-        message: "This payment has already been claimed"
-      });
-    }
-
-    await pool.query(
-      `UPDATE payments SET user_id = $1, is_anonymous = false, updated_at = NOW() 
-       WHERE transaction_reference = $2`,
-      [newUserId, reference]
-    );
-
-    await activateSubscription(newUserId, plan, payment.id);
-
-    console.log(`=== SUBSCRIPTION CLAIMED SUCCESSFULLY ===`);
-
-    return res.json({
-      success: true,
-      plan,
-      message: "Subscription claimed successfully"
-    });
-  } catch (error) {
-    console.error("Claim subscription error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to claim subscription"
     });
   }
 });

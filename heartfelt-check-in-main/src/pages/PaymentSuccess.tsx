@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Check, AlertCircle, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-type VerificationState = "verifying" | "success" | "success_anonymous" | "pending" | "failed";
+type VerificationState = "verifying" | "success" | "pending" | "failed";
 
 const PaymentSuccess = () => {
   const navigate = useNavigate();
@@ -40,25 +40,16 @@ const PaymentSuccess = () => {
 
         if (data.success) {
           const userId = localStorage.getItem("current_user_id");
-          const pendingAnonUserId = localStorage.getItem("pending_anon_user_id");
-          const isAnonymousPayment = !!pendingAnonUserId || (userId && userId.startsWith("anon_"));
           
           setPlanName(data.plan || localStorage.getItem("pending_payment_plan") || "Premium");
           
-          if (userId && !isAnonymousPayment) {
+          if (userId) {
             localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
             localStorage.setItem(`subscription_plan__${userId}`, data.plan);
             localStorage.setItem(`subscription_activated_at__${userId}`, new Date().toISOString());
           }
           
-          if (isAnonymousPayment) {
-            setState("success_anonymous");
-          } else {
-            localStorage.removeItem("pending_payment_plan");
-            localStorage.removeItem("pending_transaction_ref");
-            localStorage.removeItem("pending_anon_user_id");
-            setState("success");
-          }
+          setState("success");
         } else if (data.status === "pending" && retryCount < 10) {
           setTimeout(() => {
             setRetryCount(prev => prev + 1);
@@ -119,42 +110,6 @@ const PaymentSuccess = () => {
             </Button>
             <Button variant="outline" onClick={() => navigate("/home")} className="w-full">
               Go to Home
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (state === "success_anonymous") {
-    return (
-      <div className="min-h-screen gradient-bg flex flex-col items-center justify-center px-6">
-        <div className="text-center max-w-md">
-          <div className="w-20 h-20 rounded-full bg-green-500/20 flex items-center justify-center mx-auto mb-6">
-            <Check className="w-10 h-10 text-green-500" />
-          </div>
-          
-          <h1 className="text-2xl font-semibold text-foreground mb-3">
-            Payment Successful!
-          </h1>
-          
-          <p className="text-soft mb-4">
-            Thank you for purchasing {planName} access!
-          </p>
-          
-          <div className="bg-card/50 rounded-xl p-4 mb-6 border border-border">
-            <div className="flex items-center gap-3 mb-2">
-              <UserPlus className="w-5 h-5 text-primary" />
-              <span className="font-medium text-foreground">Almost there!</span>
-            </div>
-            <p className="text-soft text-sm text-left">
-              Let's finish setting up your account to secure your subscription and access all features.
-            </p>
-          </div>
-          
-          <div className="space-y-3">
-            <Button onClick={() => navigate("/?continue=reminder")} className="w-full">
-              Continue Setup
             </Button>
           </div>
         </div>
