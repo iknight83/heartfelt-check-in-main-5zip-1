@@ -8,6 +8,7 @@ import ReminderScreen from "@/components/ReminderScreen";
 import FactorSelectionScreen from "@/components/FactorSelectionScreen";
 import PaywallScreen from "@/components/PaywallScreen";
 import { useAuth } from "@/hooks/useAuth";
+import { useSubscription } from "@/hooks/useSubscription";
 
 interface UserSelections {
   emotions: string[];
@@ -26,8 +27,11 @@ type OnboardingStep = "emotions" | "duration" | "support" | "factorSelection" | 
 const Index = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
+  const { isSubscribed, isTrialActive, refreshSubscription } = useSubscription(user?.id);
   const [step, setStep] = useState<OnboardingStep>("emotions");
+  const [checkingAccess, setCheckingAccess] = useState(true);
+  const [accessCheckComplete, setAccessCheckComplete] = useState(false);
   const [selections, setSelections] = useState<UserSelections>({
     emotions: [],
     duration: null,
@@ -41,32 +45,57 @@ const Index = () => {
   });
 
   useEffect(() => {
-    if (loading) return;
+    if (authLoading) return;
     
-    const timeoutId = setTimeout(() => {
-      const userId = localStorage.getItem("current_user_id");
+    const checkUserAccess = async () => {
+      const userId = user?.id || localStorage.getItem("current_user_id");
       
-      let hasCompletedOnboarding = false;
-      if (userId) {
-        hasCompletedOnboarding = !!localStorage.getItem(`termsAcceptedAt__${userId}`);
+      if (!userId) {
+        setCheckingAccess(false);
+        setAccessCheckComplete(true);
+        return;
       }
-      if (!hasCompletedOnboarding) {
-        hasCompletedOnboarding = !!localStorage.getItem("termsAcceptedAt");
-      }
+
+      let hasCompletedOnboarding = !!localStorage.getItem(`termsAcceptedAt__${userId}`) || 
+                                    !!localStorage.getItem("termsAcceptedAt");
       
-      if (hasCompletedOnboarding && userId) {
+      if (hasCompletedOnboarding) {
         navigate("/home", { replace: true });
         return;
       }
 
-      const continueStep = searchParams.get("continue");
-      if (continueStep === "reminder" && userId) {
-        setStep("reminder");
-      }
-    }, 100);
+      await refreshSubscription(userId);
+      
+      setAccessCheckComplete(true);
+    };
     
-    return () => clearTimeout(timeoutId);
-  }, [navigate, loading, searchParams]);
+    checkUserAccess();
+  }, [authLoading, user, navigate, refreshSubscription]);
+  
+  useEffect(() => {
+    if (!accessCheckComplete) return;
+    
+    const userId = user?.id || localStorage.getItem("current_user_id");
+    if (!userId) {
+      setCheckingAccess(false);
+      return;
+    }
+    
+    const hasActiveAccess = isSubscribed || isTrialActive;
+    
+    if (hasActiveAccess) {
+      localStorage.setItem(`termsAcceptedAt__${userId}`, new Date().toISOString());
+      navigate("/home", { replace: true });
+      return;
+    }
+    
+    const continueStep = searchParams.get("continue");
+    if (continueStep === "reminder") {
+      setStep("reminder");
+    }
+    
+    setCheckingAccess(false);
+  }, [accessCheckComplete, isSubscribed, isTrialActive, user, navigate, searchParams]);
 
   const handleEmotionsContinue = (emotions: string[]) => {
     setSelections((prev) => ({ ...prev, emotions, skippedEmotions: false }));
@@ -118,9 +147,22 @@ const Index = () => {
     }
 
     if (plan === "trial") {
-      const trialKey = `trial_started_at__${userId}`;
-      if (!localStorage.getItem(trialKey)) {
-        localStorage.setItem(trialKey, Date.now().toString());
+      try {
+        const response = await fetch("/api/paystack/trial/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.trialStartedAt) {
+          const trialKey = `trial_started_at__${userId}`;
+          const trialStart = new Date(data.trialStartedAt).getTime();
+          localStorage.setItem(trialKey, trialStart.toString());
+        }
+      } catch (error) {
+        console.error("Failed to start trial:", error);
       }
       setStep("reminder");
       return;
@@ -184,6 +226,15 @@ const Index = () => {
       console.error("Restore failed:", error);
     }
   };
+
+  if (authLoading || checkingAccess) {
+    return (
+      <div className="min-h-screen gradient-bg flex flex-col items-center justify-center px-6">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+        <p className="text-foreground text-lg">Loading...</p>
+      </div>
+    );
+  }
 
   if (step === "emotions") {
     return (

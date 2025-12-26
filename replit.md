@@ -114,6 +114,16 @@ The app now uses a robust data migration pattern:
 4. **Email Users**: Sign-out preserves termsAcceptedAt so they skip onboarding on return
 5. **Legacy Support**: Index.tsx checks both user-scoped and global termsAcceptedAt keys for backwards compatibility
 
+### Onboarding Skip Logic (Fixed Dec 2025)
+Existing users with active subscriptions or trials skip onboarding automatically:
+
+1. **Access Check on Index**: Index.tsx checks both `termsAcceptedAt` AND subscription/trial status
+2. **Subscription Hook Reactivity**: `useSubscription` polls for user ID changes and refreshes subscription status
+3. **Backend as Source of Truth**: Subscription check calls backend `/api/paystack/subscription/:userId`
+4. **Trial = Active Access**: Users on active free trial are treated as having access
+5. **Auto-Complete Onboarding**: If user has active access but no termsAcceptedAt, it's set automatically
+6. **Redirect to Journal**: Users with active subscription OR active trial go directly to /home
+
 ## External Dependencies
 
 ### Authentication & Backend

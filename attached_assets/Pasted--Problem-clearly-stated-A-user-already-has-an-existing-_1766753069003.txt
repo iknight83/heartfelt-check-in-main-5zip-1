@@ -1,0 +1,108 @@
+🧠 Problem (clearly stated)
+
+A user already has an existing account
+
+That account is on an active Free Trial
+
+When they sign in, they should:
+✅ Go directly to the Journal page
+❌ NOT be sent back to onboarding
+❌ NOT lose any history
+
+Additionally:
+
+ALL user history must persist:
+
+Check-ins
+
+Emotional tracking
+
+Factors
+
+Patterns
+
+Anything previously saved or tracked
+
+✅ Correct rule (this is the law)
+
+If a user has an existing account and an active subscription OR active free trial, onboarding must NEVER show again.
+
+Onboarding is one-time only, unless the user is brand new.
+
+🧾 COPY–PASTE THIS PROMPT INTO REPLIT
+IMPORTANT FIX – EXISTING USER WITH FREE TRIAL REDIRECT BUG
+
+There is a bug in the auth/onboarding logic.
+
+EXPECTED BEHAVIOR (THIS IS REQUIRED):
+1. If a user SIGNS IN with an existing account
+2. AND that user has:
+   - an active free trial
+   - OR an active paid subscription
+3. THEN they must be redirected DIRECTLY to the Journal page (/home)
+4. They must NEVER see onboarding again
+5. They must NEVER be sent back to the paywall
+6. Their full app history MUST remain intact:
+   - emotional check-ins
+   - tracked factors
+   - patterns
+   - insights
+   - any historical data already saved
+
+INCORRECT CURRENT BEHAVIOR:
+- Existing users on free trial are sometimes sent back into onboarding after sign-in.
+
+WHAT TO FIX:
+- On login (SIGNED_IN or session restore):
+  - Fetch subscription status from backend
+  - If subscription OR free trial is active:
+    - Immediately redirect to /home
+    - Skip onboarding completely
+- Onboarding should ONLY ever run if:
+  - User is brand new
+  - AND has never completed onboarding before
+
+TECHNICAL REQUIREMENTS:
+- Backend is the source of truth for subscription/trial status
+- Trial must count as "active access"
+- Do NOT rely only on localStorage
+- Preserve all existing user data (DO NOT reset anything)
+- Ensure this logic runs on:
+  - first sign-in
+  - returning sessions
+  - page refresh
+
+FINAL GOAL:
+Existing users (trial or paid) → Sign in → Journal page → History preserved.
+No exceptions.
+
+🔍 Why this prompt works
+
+It tells Replit exactly when onboarding is allowed
+
+It clearly defines trial = active access
+
+It explicitly forbids:
+
+data resets
+
+onboarding re-entry
+
+paywall loops
+
+It reinforces backend as source of truth
+
+It protects user history (critical for trust)
+
+🧪 After Replit fixes it, quickly test this
+
+Create account
+
+Start free trial
+
+Log out
+
+Log back in
+
+✅ You should land directly on Journal
+❌ If you see onboarding → it’s still wrong

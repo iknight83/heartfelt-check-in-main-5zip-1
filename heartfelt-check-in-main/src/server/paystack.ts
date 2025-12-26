@@ -33,6 +33,99 @@ interface SubscriptionAccess {
   isLifetime: boolean;
 }
 
+interface TrialAccess {
+  hasTrial: boolean;
+  isTrialActive: boolean;
+  trialStartedAt: Date | null;
+  trialExpiresAt: Date | null;
+}
+
+const TRIAL_DURATION_DAYS = 7;
+
+const getTrialAccess = async (userId: string): Promise<TrialAccess> => {
+  try {
+    const result = await pool.query(
+      `SELECT * FROM trials WHERE user_id = $1`,
+      [userId]
+    );
+
+    const now = new Date();
+
+    if (result.rows.length === 0) {
+      return {
+        hasTrial: false,
+        isTrialActive: false,
+        trialStartedAt: null,
+        trialExpiresAt: null,
+      };
+    }
+
+    const trial = result.rows[0];
+    const expiresAt = new Date(trial.expires_at);
+    const isActive = expiresAt > now;
+
+    if (!isActive && trial.is_active) {
+      await pool.query(
+        `UPDATE trials SET is_active = false WHERE user_id = $1`,
+        [userId]
+      );
+    }
+
+    return {
+      hasTrial: true,
+      isTrialActive: isActive,
+      trialStartedAt: trial.started_at,
+      trialExpiresAt: trial.expires_at,
+    };
+  } catch (error) {
+    console.error("Error checking trial access:", error);
+    return {
+      hasTrial: false,
+      isTrialActive: false,
+      trialStartedAt: null,
+      trialExpiresAt: null,
+    };
+  }
+};
+
+const startTrial = async (userId: string): Promise<TrialAccess> => {
+  try {
+    const existing = await pool.query(
+      `SELECT * FROM trials WHERE user_id = $1`,
+      [userId]
+    );
+
+    if (existing.rows.length > 0) {
+      return getTrialAccess(userId);
+    }
+
+    const now = new Date();
+    const expiresAt = new Date(now);
+    expiresAt.setDate(expiresAt.getDate() + TRIAL_DURATION_DAYS);
+    
+    await pool.query(
+      `INSERT INTO trials (user_id, started_at, expires_at, is_active) 
+       VALUES ($1, $2, $3, true)`,
+      [userId, now, expiresAt]
+    );
+
+    return {
+      hasTrial: true,
+      isTrialActive: true,
+      trialStartedAt: now,
+      trialExpiresAt: expiresAt,
+    };
+  } catch (error) {
+    console.error("Error starting trial:", error);
+    return {
+      hasTrial: false,
+      isTrialActive: false,
+      trialStartedAt: null,
+      trialExpiresAt: null,
+    };
+  }
+};
+
 const generateReference = (): string => {
   const timestamp = Date.now();
   const random = crypto.randomBytes(4).toString("hex").toUpperCase();
@@ -445,21 +538,63 @@ router.post("/verify", async (req, res) => {
 router.get("/subscription/:userId", async (req, res) => {
   try {
     const { userId } = req.params;
-    const access = await getUserSubscriptionAccess(userId);
+    const [access, trialAccess] = await Promise.all([
+      getUserSubscriptionAccess(userId),
+      getTrialAccess(userId),
+    ]);
+
+    const hasActiveAccess = access.hasAccess || trialAccess.isTrialActive;
 
     return res.json({
       hasSubscription: access.hasAccess,
+      hasTrial: trialAccess.hasTrial,
+      isTrialActive: trialAccess.isTrialActive,
+      hasActiveAccess,
       plan: access.plan,
       status: access.status,
       expiresAt: access.expiresAt,
       isLifetime: access.isLifetime,
+      trialStartedAt: trialAccess.trialStartedAt,
+      trialExpiresAt: trialAccess.trialExpiresAt,
     });
   } catch (error) {
     console.error("Get subscription error:", error);
     return res.status(500).json({
       hasSubscription: false,
+      hasTrial: false,
+      isTrialActive: false,
+      hasActiveAccess: false,
       status: "none",
       message: "Failed to check subscription"
+    });
+  }
+});
+
+router.post("/trial/start", async (req, res) => {
+  try {
+    const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({
+        success: false,
+        message: "User ID is required"
+      });
+    }
+
+    const trialAccess = await startTrial(userId);
+
+    return res.json({
+      success: true,
+      hasTrial: trialAccess.hasTrial,
+      isTrialActive: trialAccess.isTrialActive,
+      trialStartedAt: trialAccess.trialStartedAt,
+      trialExpiresAt: trialAccess.trialExpiresAt,
+    });
+  } catch (error) {
+    console.error("Start trial error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to start trial"
     });
   }
 });

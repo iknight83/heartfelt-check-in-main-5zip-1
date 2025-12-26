@@ -27,7 +27,7 @@ interface UseSubscriptionResult {
   canGenerateNewPatterns: boolean;
   subscribe: (plan?: "monthly" | "annual" | "lifetime") => void;
   checkAccess: () => Promise<boolean>;
-  refreshSubscription: () => Promise<void>;
+  refreshSubscription: (userIdOverride?: string) => Promise<void>;
 }
 
 const TRIAL_DURATION_DAYS = 7;
@@ -64,7 +64,7 @@ const getUniqueCheckInDays = (): number => {
   return uniqueDates.size;
 };
 
-export const useSubscription = (): UseSubscriptionResult => {
+export const useSubscription = (providedUserId?: string): UseSubscriptionResult => {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [plan, setPlan] = useState<string | null>(null);
@@ -73,9 +73,14 @@ export const useSubscription = (): UseSubscriptionResult => {
   const [uniqueCheckInDays, setUniqueCheckInDays] = useState(0);
   const [trialStartTime, setTrialStartTime] = useState<number | null>(null);
   const [backendChecked, setBackendChecked] = useState(false);
+  const [lastCheckedUserId, setLastCheckedUserId] = useState<string | null>(null);
 
-  const checkBackendSubscription = useCallback(async (): Promise<SubscriptionAccess | null> => {
-    const userId = getUserId();
+  const getEffectiveUserId = useCallback((): string | null => {
+    return providedUserId || getUserId();
+  }, [providedUserId]);
+
+  const checkBackendSubscription = useCallback(async (userIdOverride?: string): Promise<SubscriptionAccess | null> => {
+    const userId = userIdOverride || getEffectiveUserId();
     if (!userId) return null;
 
     try {
@@ -83,8 +88,18 @@ export const useSubscription = (): UseSubscriptionResult => {
       if (!response.ok) return null;
       
       const data = await response.json();
+      
+      if (data.isTrialActive && data.trialExpiresAt) {
+        const trialExpiry = new Date(data.trialExpiresAt);
+        const trialStartKey = `${TRIAL_STARTED_KEY}__${userId}`;
+        const now = Date.now();
+        const msRemaining = trialExpiry.getTime() - now;
+        const trialStartTime = now - ((TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000) - msRemaining);
+        localStorage.setItem(trialStartKey, trialStartTime.toString());
+      }
+      
       return {
-        hasAccess: data.hasSubscription,
+        hasAccess: data.hasActiveAccess || data.hasSubscription || data.isTrialActive,
         plan: data.plan || null,
         status: data.status || (data.hasSubscription ? "active" : "none"),
         expiresAt: data.expiresAt || null,
@@ -94,7 +109,7 @@ export const useSubscription = (): UseSubscriptionResult => {
       console.error("Failed to check backend subscription:", error);
       return null;
     }
-  }, []);
+  }, [getEffectiveUserId]);
 
   const syncLocalStorage = useCallback((access: SubscriptionAccess) => {
     const subscriptionKey = getUserStorageKey(SUBSCRIPTION_KEY);
@@ -112,9 +127,9 @@ export const useSubscription = (): UseSubscriptionResult => {
     }
   }, []);
 
-  const refreshSubscription = useCallback(async () => {
+  const refreshSubscription = useCallback(async (userIdOverride?: string) => {
     setIsLoading(true);
-    const access = await checkBackendSubscription();
+    const access = await checkBackendSubscription(userIdOverride);
     
     if (access) {
       syncLocalStorage(access);
@@ -129,11 +144,24 @@ export const useSubscription = (): UseSubscriptionResult => {
   }, [checkBackendSubscription, syncLocalStorage]);
 
   useEffect(() => {
-    const subscriptionKey = getUserStorageKey(SUBSCRIPTION_KEY);
-    const planKey = getUserStorageKey(SUBSCRIPTION_PLAN_KEY);
-    const expiresKey = getUserStorageKey(SUBSCRIPTION_EXPIRES_KEY);
-    const lifetimeKey = getUserStorageKey(SUBSCRIPTION_IS_LIFETIME_KEY);
-    const trialStartKey = getUserStorageKey(TRIAL_STARTED_KEY);
+    const currentUserId = getEffectiveUserId();
+    
+    if (!currentUserId) {
+      setIsLoading(false);
+      return;
+    }
+    
+    if (currentUserId !== lastCheckedUserId) {
+      setLastCheckedUserId(currentUserId);
+      setIsLoading(true);
+      setBackendChecked(false);
+    }
+    
+    const subscriptionKey = `${SUBSCRIPTION_KEY}__${currentUserId}`;
+    const planKey = `${SUBSCRIPTION_PLAN_KEY}__${currentUserId}`;
+    const expiresKey = `${SUBSCRIPTION_EXPIRES_KEY}__${currentUserId}`;
+    const lifetimeKey = `${SUBSCRIPTION_IS_LIFETIME_KEY}__${currentUserId}`;
+    const trialStartKey = `${TRIAL_STARTED_KEY}__${currentUserId}`;
     
     const storedSubscription = localStorage.getItem(subscriptionKey);
     const storedPlan = localStorage.getItem(planKey);
@@ -147,19 +175,17 @@ export const useSubscription = (): UseSubscriptionResult => {
       setIsLifetime(storedLifetime === "true");
     }
 
-    let startTime = localStorage.getItem(trialStartKey);
-    if (!startTime && storedSubscription !== "true") {
-      startTime = Date.now().toString();
-      localStorage.setItem(trialStartKey, startTime);
-    }
+    const startTime = localStorage.getItem(trialStartKey);
     if (startTime) {
       setTrialStartTime(parseInt(startTime));
+    } else {
+      setTrialStartTime(null);
     }
 
     setUniqueCheckInDays(getUniqueCheckInDays());
 
-    refreshSubscription();
-  }, [refreshSubscription]);
+    refreshSubscription(currentUserId);
+  }, [providedUserId, getEffectiveUserId, refreshSubscription, lastCheckedUserId]);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -210,8 +236,9 @@ export const useSubscription = (): UseSubscriptionResult => {
       };
     }
 
-    let trialDaysRemaining = TRIAL_DURATION_DAYS;
+    let trialDaysRemaining = 0;
     let trialDaysUsed = 0;
+    let isTrialActive = false;
 
     if (trialStartTime) {
       const now = Date.now();
@@ -220,9 +247,8 @@ export const useSubscription = (): UseSubscriptionResult => {
       
       trialDaysUsed = Math.floor(daysSinceStart);
       trialDaysRemaining = Math.max(0, TRIAL_DURATION_DAYS - trialDaysUsed);
+      isTrialActive = trialDaysRemaining > 0;
     }
-
-    const isTrialActive = trialDaysRemaining > 0;
 
     return {
       status: isTrialActive ? "trial" : "expired" as SubscriptionStatus,
