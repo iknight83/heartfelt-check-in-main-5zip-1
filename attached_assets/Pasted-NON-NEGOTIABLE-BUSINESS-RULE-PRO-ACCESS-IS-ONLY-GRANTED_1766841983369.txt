@@ -1,0 +1,155 @@
+NON-NEGOTIABLE BUSINESS RULE
+
+PRO ACCESS IS ONLY GRANTED AFTER A SUCCESSFUL PAYMENT.
+
+Free Trial, Registration, Login, or Anonymous usage must NEVER grant Pro access.
+
+1️⃣ PRO STATUS (PAID ONLY)
+
+A user is PRO if and only if ALL are true:
+
+A verified Paystack payment exists
+
+is_paid = true
+
+plan_type ∈ ["monthly", "annual", "lifetime"]
+
+Backend verification confirms payment
+
+❌ Free Trial ≠ Pro
+❌ Registered User ≠ Pro
+❌ Logged-in User ≠ Pro
+
+If no payment exists → user is NOT PRO.
+
+2️⃣ FREE TRIAL RULES (STRICT)
+
+If a user selects Free Trial:
+
+plan_type = "trial"
+
+is_paid = false
+
+is_pro = false
+
+UI must display:
+
+“Free Trial”
+
+UI must NEVER display:
+
+“Pro Member”
+
+Crown icons
+
+Premium labels
+
+Free Trial users must not unlock Pro features.
+
+3️⃣ REGISTRATION DOES NOT CHANGE ACCESS
+
+Registering or signing in must ONLY:
+
+Create an account
+
+Sync existing data
+
+It must NOT:
+
+Grant Pro access
+
+Start trials automatically
+
+Change plan type
+
+Unlock premium features
+
+Registered users without payment remain NOT PRO.
+
+4️⃣ TRACKING FACTORS — MUST ALWAYS SAVE
+
+Tracking factors selected during onboarding must:
+
+Save for anonymous users
+
+Persist after signup
+
+Persist after login
+
+Persist for trial users
+
+Persist for paid users
+
+❌ Signup must NOT reset factors
+❌ Trial selection must NOT skip factor saving
+❌ Payment must NOT overwrite onboarding data
+
+Selected = Saved. Always.
+
+5️⃣ PAYWALL BEHAVIOR
+
+Available options:
+
+Free Trial
+
+Monthly
+
+Annual
+
+Lifetime
+
+Rules:
+
+Free Trial → continue onboarding → NOT PRO
+
+Paid plan → Paystack → verify → PRO
+
+❌ Trial must never route into Pro logic
+❌ Trial must never set is_pro = true
+
+6️⃣ BACKEND IS SOURCE OF TRUTH
+
+Backend must return subscription state explicitly:
+
+{
+  "plan_type": "trial" | "monthly" | "annual" | "lifetime" | null,
+  "is_paid": boolean,
+  "is_pro": boolean,
+  "expires_at": date | null
+}
+
+
+Frontend must:
+
+Trust backend only
+
+Never infer Pro from trial or login
+
+7️⃣ UI LABEL RULE (MANDATORY)
+
+is_pro === true → show “Pro Member”
+
+plan_type === "trial" → show “Free Trial”
+
+otherwise → show “Free”
+
+❌ Never show Pro unless is_pro === true
+
+8️⃣ REQUIRED TESTS
+
+Trial user → NOT PRO
+
+Registered user → NOT PRO
+
+Trial + login → NOT PRO
+
+Paid user → PRO
+
+Expired plan → locked → NOT PRO
+
+Factors persist through signup & login
+
+FINAL RULE
+
+NO PAYMENT = NO PRO
+No exceptions. No assumptions. No shortcuts.

@@ -6,6 +6,9 @@ export type SubscriptionStatus = "trial" | "expired" | "subscribed" | "loading";
 interface SubscriptionAccess {
   hasAccess: boolean;
   hasSubscription: boolean;
+  isPro: boolean;
+  isPaid: boolean;
+  planType: string | null;
   plan: string | null;
   status: "active" | "expired" | "none";
   expiresAt: string | null;
@@ -110,7 +113,10 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
       
       return {
         hasAccess: data.hasActiveAccess || data.hasSubscription || data.isTrialActive,
-        hasSubscription: data.hasSubscription || false,
+        hasSubscription: data.is_pro || data.hasSubscription || false,
+        isPro: data.is_pro || false,
+        isPaid: data.is_paid || false,
+        planType: data.plan_type || null,
         plan: data.plan || null,
         status: data.status || (data.hasSubscription ? "active" : "none"),
         expiresAt: data.expiresAt || null,

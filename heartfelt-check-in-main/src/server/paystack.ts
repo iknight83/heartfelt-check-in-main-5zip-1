@@ -544,6 +544,13 @@ router.get("/subscription/:userId", async (req, res) => {
     ]);
 
     const hasActiveAccess = access.hasAccess || trialAccess.isTrialActive;
+    
+    const isPaid = access.hasAccess && access.plan !== null;
+    const isPro = isPaid;
+    
+    const planType = trialAccess.isTrialActive && !isPaid 
+      ? "trial" 
+      : access.plan;
 
     return res.json({
       hasSubscription: access.hasAccess,
@@ -551,8 +558,12 @@ router.get("/subscription/:userId", async (req, res) => {
       isTrialActive: trialAccess.isTrialActive,
       hasActiveAccess,
       plan: access.plan,
+      plan_type: planType,
+      is_paid: isPaid,
+      is_pro: isPro,
       status: access.status,
       expiresAt: access.expiresAt,
+      expires_at: access.expiresAt,
       isLifetime: access.isLifetime,
       trialStartedAt: trialAccess.trialStartedAt,
       trialExpiresAt: trialAccess.trialExpiresAt,
@@ -564,6 +575,9 @@ router.get("/subscription/:userId", async (req, res) => {
       hasTrial: false,
       isTrialActive: false,
       hasActiveAccess: false,
+      plan_type: null,
+      is_paid: false,
+      is_pro: false,
       status: "none",
       message: "Failed to check subscription"
     });
