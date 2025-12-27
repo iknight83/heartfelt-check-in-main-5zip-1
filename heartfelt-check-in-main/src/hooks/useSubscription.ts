@@ -5,6 +5,7 @@ export type SubscriptionStatus = "trial" | "expired" | "subscribed" | "loading";
 
 interface SubscriptionAccess {
   hasAccess: boolean;
+  hasSubscription: boolean;
   plan: string | null;
   status: "active" | "expired" | "none";
   expiresAt: string | null;
@@ -108,7 +109,8 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
       }
       
       return {
-        hasAccess: data.hasSubscription,
+        hasAccess: data.hasActiveAccess || data.hasSubscription || data.isTrialActive,
+        hasSubscription: data.hasSubscription || false,
         plan: data.plan || null,
         status: data.status || (data.hasSubscription ? "active" : "none"),
         expiresAt: data.expiresAt || null,
@@ -126,7 +128,7 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
     const expiresKey = getUserStorageKey(SUBSCRIPTION_EXPIRES_KEY);
     const lifetimeKey = getUserStorageKey(SUBSCRIPTION_IS_LIFETIME_KEY);
 
-    if (access.hasAccess) {
+    if (access.hasSubscription) {
       localStorage.setItem(subscriptionKey, "true");
       if (access.plan) localStorage.setItem(planKey, access.plan);
       if (access.expiresAt) localStorage.setItem(expiresKey, access.expiresAt);
@@ -142,7 +144,7 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
     
     if (access) {
       syncLocalStorage(access);
-      setIsSubscribed(access.hasAccess);
+      setIsSubscribed(access.hasSubscription);
       setPlan(access.plan);
       setExpiresAt(access.expiresAt ? new Date(access.expiresAt) : null);
       setIsLifetime(access.isLifetime);
@@ -225,9 +227,23 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
   }, [backendChecked, isLifetime, isSubscribed, expiresAt]);
 
   const checkAccess = useCallback(async (): Promise<boolean> => {
-    await refreshSubscription();
-    return isSubscribed;
-  }, [refreshSubscription, isSubscribed]);
+    const access = await checkBackendSubscription();
+    if (access) {
+      syncLocalStorage(access);
+      setIsSubscribed(access.hasSubscription);
+      setPlan(access.plan);
+      setExpiresAt(access.expiresAt ? new Date(access.expiresAt) : null);
+      setIsLifetime(access.isLifetime);
+      setBackendChecked(true);
+      return access.hasAccess;
+    }
+    return isSubscribed || (trialStartTime !== null && (() => {
+      const now = Date.now();
+      const millisecondsPerDay = 24 * 60 * 60 * 1000;
+      const daysSinceStart = (now - trialStartTime) / millisecondsPerDay;
+      return Math.max(0, TRIAL_DURATION_DAYS - Math.floor(daysSinceStart)) > 0;
+    })());
+  }, [checkBackendSubscription, syncLocalStorage, isSubscribed, trialStartTime]);
 
   const subscriptionDetails = useMemo(() => {
     if (isLoading) {
