@@ -127,6 +127,18 @@ Existing users with active subscriptions or trials skip onboarding automatically
 6. **Auto-Complete Onboarding**: If user has active access but no termsAcceptedAt, it's set automatically
 7. **Redirect to Journal**: Users with active subscription OR active trial go directly to /home
 
+### Free Trial Visibility Logic (Fixed Dec 2025)
+The Free Trial option on the Paywall follows strict eligibility rules:
+
+1. **Eligibility States**: `hasEverUsedTrial` is a tri-state: `null` (unknown), `false` (eligible), `true` (ineligible)
+2. **No User ID**: When no user ID exists (pre-auth), all subscription state is reset and hasEverUsedTrial=false → Free Trial VISIBLE
+3. **User ID Changes**: When user ID changes, hasEverUsedTrial resets to null → Free Trial HIDDEN until backend confirms
+4. **Backend Confirmation**: After backend check, hasEverUsedTrial is set based on `hasTrial` response
+5. **Show Free Trial**: Only when `!isSubscribed && hasEverUsedTrial === false`
+6. **Hide Free Trial**: When hasEverUsedTrial is null (loading/unknown) or true (trial already used)
+7. **Trial Start**: When user clicks Free Trial, frontend calls `/api/paystack/trial/start` to create trial record
+8. **Error Handling**: Network failures default to hiding trial (safe) and show error if user tries to start expired trial
+
 ## External Dependencies
 
 ### Authentication & Backend
