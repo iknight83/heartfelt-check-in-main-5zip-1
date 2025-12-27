@@ -108,7 +108,7 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
       }
       
       return {
-        hasAccess: data.hasActiveAccess || data.hasSubscription || data.isTrialActive,
+        hasAccess: data.hasSubscription,
         plan: data.plan || null,
         status: data.status || (data.hasSubscription ? "active" : "none"),
         expiresAt: data.expiresAt || null,
