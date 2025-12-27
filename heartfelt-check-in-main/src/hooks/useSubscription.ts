@@ -23,6 +23,7 @@ interface UseSubscriptionResult {
   trialDaysRemaining: number;
   trialDaysUsed: number;
   trialStartDate: Date | null;
+  hasEverUsedTrial: boolean | null;
   maxAllowedConfidence: 'Exploratory' | 'Emerging' | 'Moderate' | 'Strong';
   canGenerateNewPatterns: boolean;
   subscribe: (plan?: "monthly" | "annual" | "lifetime") => void;
@@ -72,6 +73,7 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
   const [isLifetime, setIsLifetime] = useState(false);
   const [uniqueCheckInDays, setUniqueCheckInDays] = useState(0);
   const [trialStartTime, setTrialStartTime] = useState<number | null>(null);
+  const [hasEverUsedTrial, setHasEverUsedTrial] = useState<boolean | null>(null);
   const [backendChecked, setBackendChecked] = useState(false);
   const [lastCheckedUserId, setLastCheckedUserId] = useState<string | null>(null);
 
@@ -89,6 +91,12 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
       
       const data = await response.json();
       
+      if (data.hasTrial) {
+        setHasEverUsedTrial(true);
+      } else {
+        setHasEverUsedTrial(false);
+      }
+      
       if (data.isTrialActive && data.trialExpiresAt) {
         const trialExpiry = new Date(data.trialExpiresAt);
         const trialStartKey = `${TRIAL_STARTED_KEY}__${userId}`;
@@ -96,6 +104,7 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
         const msRemaining = trialExpiry.getTime() - now;
         const trialStartTime = now - ((TRIAL_DURATION_DAYS * 24 * 60 * 60 * 1000) - msRemaining);
         localStorage.setItem(trialStartKey, trialStartTime.toString());
+        setTrialStartTime(trialStartTime);
       }
       
       return {
@@ -148,6 +157,14 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
     
     if (!currentUserId) {
       setIsLoading(false);
+      setHasEverUsedTrial(false);
+      setIsSubscribed(false);
+      setPlan(null);
+      setExpiresAt(null);
+      setIsLifetime(false);
+      setTrialStartTime(null);
+      setBackendChecked(false);
+      setLastCheckedUserId(null);
       return;
     }
     
@@ -155,6 +172,7 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
       setLastCheckedUserId(currentUserId);
       setIsLoading(true);
       setBackendChecked(false);
+      setHasEverUsedTrial(null);
     }
     
     const subscriptionKey = `${SUBSCRIPTION_KEY}__${currentUserId}`;
@@ -285,6 +303,7 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
     plan,
     expiresAt,
     isLifetime,
+    hasEverUsedTrial,
     trialStartDate: trialStartTime ? new Date(trialStartTime) : null,
     subscribe,
     checkAccess,

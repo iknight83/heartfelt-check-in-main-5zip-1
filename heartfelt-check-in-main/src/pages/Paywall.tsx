@@ -83,9 +83,39 @@ const Paywall = () => {
     }
   };
 
-  const handleContinue = (plan: "lifetime" | "annual" | "monthly" | "trial") => {
+  const handleContinue = async (plan: "lifetime" | "annual" | "monthly" | "trial") => {
     if (plan === "trial") {
-      navigate("/home");
+      const userId = user?.id;
+      if (!userId) {
+        toast.error("Please sign in to start a free trial");
+        navigate("/");
+        return;
+      }
+      
+      try {
+        setIsProcessing(true);
+        const response = await fetch("/api/paystack/trial/start", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ userId }),
+        });
+        
+        const data = await response.json();
+        
+        if (data.success && data.isTrialActive) {
+          toast.success("Your 7-day free trial has started!");
+          navigate("/home");
+        } else if (data.hasTrial && !data.isTrialActive) {
+          toast.error("Your free trial has expired. Please select a paid plan.");
+        } else {
+          toast.error(data.message || "Failed to start trial");
+        }
+      } catch (error) {
+        console.error("Failed to start trial:", error);
+        toast.error("Failed to start trial. Please try again.");
+      } finally {
+        setIsProcessing(false);
+      }
     } else {
       setConfirmingPlan(plan);
     }

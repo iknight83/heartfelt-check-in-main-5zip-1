@@ -1,0 +1,187 @@
+1️⃣ Why the Free Trial disappeared (what’s actually wrong)
+
+From the screenshots and flow you described, this is what’s happening:
+
+Your current flow (after recent changes)
+
+Auth now happens before the paywall ✅
+
+Backend is the source of truth for subscription & trial status ✅
+
+Anonymous users can still continue onboarding ✅
+
+The problem
+
+When the user reaches the paywall for the first time:
+
+The backend does NOT yet have a trial record
+
+Your frontend logic is now saying:
+
+“If no active trial exists → don’t show Free Trial”
+
+So:
+
+New users (first-time, signed in or anonymous)
+❌ see no Free Trial
+
+Only users who already started a trial earlier would see it
+
+This is why:
+
+Paywall is valid
+
+Paid plans show
+
+Free Trial option is missing
+
+👉 In short:
+You accidentally made “trial existence” a requirement to SHOW the trial, instead of a requirement to BLOCK re-using it.
+
+2️⃣ Correct business rules (locked in clearly)
+
+This is the logic you want — no ambiguity:
+
+Free Trial rules
+
+Every user is allowed ONE free trial
+
+Free trial is:
+
+Visible if the user has never started one
+
+Hidden if the user has already used it
+
+Trial must be:
+
+Created only when user clicks “Free Trial”
+
+Stored server-side
+
+Trial must:
+
+Unlock premium features
+
+Expire after X days
+
+Lock premium again after expiry
+
+Paywall visibility rules
+User state	Free Trial shown?
+New anonymous user	✅ YES
+New signed-in user	✅ YES
+Existing user, never used trial	✅ YES
+User with active trial	❌ NO
+User with expired trial	❌ NO
+User with paid subscription	❌ NO
+3️⃣ EXACT PROMPT to paste into Replit (copy–paste)
+
+Use this verbatim 👇
+It is explicit, scoped, and removes ambiguity.
+
+🔴 REPLIT PROMPT
+
+Fix the Paywall logic regarding Free Trial visibility.
+
+Problem:
+The Free Trial option is currently hidden for first-time users because the frontend only shows the trial if an active trial already exists in the backend. This is incorrect.
+
+Required behavior (must implement exactly):
+
+The Free Trial option must be shown if and only if:
+
+The user has never started a trial before
+
+This applies to:
+
+Anonymous users
+
+Newly signed-in users
+
+First-time users with no subscription history
+
+The Free Trial must be hidden if:
+
+The user has an active trial
+
+OR the user has an expired trial
+
+OR the user has any active subscription (monthly, annual, lifetime)
+
+The existence of a trial record must NOT be required to display the Free Trial option.
+
+A trial record must ONLY be created when the user explicitly clicks “Free Trial”.
+
+Trial status must be stored and validated server-side (no localStorage-only logic).
+
+The paywall must always show:
+
+Paid plans
+
+AND Free Trial (when eligible)
+
+After starting a Free Trial:
+
+User continues onboarding
+
+Trial unlocks premium features
+
+Trial expiry is enforced by backend
+
+Deliverables:
+
+Fix Paywall UI logic
+
+Fix eligibility check (use hasEverUsedTrial or equivalent)
+
+Ensure Free Trial appears for first-time users
+
+Do NOT reintroduce auto-trial creation or client-side trial defaults
+
+Do not change any payment logic. Only fix Free Trial eligibility and visibility.
+
+4️⃣ Quick sanity check (after fix)
+
+Once Replit applies this, test:
+
+Test A – Brand new user
+
+Open incognito
+
+Continue anonymously
+
+Reach paywall
+✅ Free Trial visible
+
+Test B – Start Free Trial
+
+Click Free Trial
+
+Continue onboarding
+
+Reach Journal
+✅ Premium unlocked
+
+Test C – Refresh / re-login
+
+Reload app
+❌ Free Trial no longer visible
+
+Test D – Paid user
+
+Subscribe
+❌ Free Trial hidden forever
+
+5️⃣ You’re actually very close now
+
+You’ve already solved the hard parts:
+
+Payments ✅
+
+Expiry logic ✅
+
+Backend enforcement ✅
+
+Auth/onboarding split ✅
+
+This is just a visibility rule bug, not architecture.

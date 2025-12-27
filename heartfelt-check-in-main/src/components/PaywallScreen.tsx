@@ -55,17 +55,18 @@ const features = [
 ];
 
 const PaywallScreen = ({ onContinue, onRestore }: PaywallScreenProps) => {
-  const { isTrialActive, trialDaysRemaining } = useSubscription();
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>(isTrialActive ? "trial" : "lifetime");
+  const { isSubscribed, hasEverUsedTrial } = useSubscription();
+  const [selectedPlan, setSelectedPlan] = useState<PlanType>("lifetime");
 
-  // Build plans list with trial option if available
+  const showFreeTrial = !isSubscribed && hasEverUsedTrial === false;
+
   const plans: Plan[] = [
     ...basePlans,
-    ...(isTrialActive && trialDaysRemaining > 0 ? [{
+    ...(showFreeTrial ? [{
       id: "trial" as PlanType,
       name: "Free Trial",
       price: "R0",
-      period: `/ ${trialDaysRemaining} days left`,
+      period: "/ 7 days",
       subtext: "Try all features free",
       isTrial: true,
     }] : []),
