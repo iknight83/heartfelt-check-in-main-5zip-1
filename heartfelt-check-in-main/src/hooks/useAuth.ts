@@ -28,7 +28,14 @@ const syncSubscriptionFromBackend = async (userId: string) => {
 
 // Migrate pending onboarding data to user-scoped keys
 const migratePendingDataToUser = (userId: string) => {
-  // Migrate tracked factors
+  // Migrate pending tracked factors from onboarding (new format)
+  const pendingOnboardingFactors = localStorage.getItem("pending_tracked_factors");
+  if (pendingOnboardingFactors && !localStorage.getItem(`tracked_factors__${userId}`)) {
+    localStorage.setItem(`tracked_factors__${userId}`, pendingOnboardingFactors);
+    localStorage.removeItem("pending_tracked_factors");
+  }
+  
+  // Migrate tracked factors (legacy format)
   const pendingFactors = localStorage.getItem("tracked_factors");
   if (pendingFactors && !localStorage.getItem(`tracked_factors__${userId}`)) {
     localStorage.setItem(`tracked_factors__${userId}`, pendingFactors);

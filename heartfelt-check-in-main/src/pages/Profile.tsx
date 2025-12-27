@@ -242,7 +242,7 @@ const Profile = () => {
                 ) : isTrialActive ? (
                   <div className="flex items-center gap-1.5 mt-1">
                     <Clock className="w-3.5 h-3.5 text-accent" />
-                    <span className="text-accent text-sm">{trialDaysUsed}/7 days checked in</span>
+                    <span className="text-accent text-sm">Free Trial - {7 - trialDaysUsed} days left</span>
                   </div>
                 ) : (
                   <span className="text-muted-foreground text-sm">Free tier</span>

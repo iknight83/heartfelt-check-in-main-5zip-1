@@ -53,16 +53,30 @@ const FactorSelectionScreen = ({ onContinue, onBack }: FactorSelectionScreenProp
   };
 
   const handleContinue = () => {
-    // Only save factors if this is a NEW user (no termsAcceptedAt yet)
-    // Returning users keep their existing factors from before sign-out
-    const userId = localStorage.getItem("current_user_id");
-    const onboardingKey = userId ? `termsAcceptedAt__${userId}` : "termsAcceptedAt";
-    const isNewUser = !localStorage.getItem(onboardingKey);
+    // Always save factors during onboarding - they will be migrated to the user's account
+    // after authentication. Store in a pending key that will be picked up later.
+    // This ensures factors persist whether user is anonymous or registers.
     
-    if (isNewUser) {
-      // Only save for brand new users
+    // Save to pending storage (will be migrated to user-scoped key after auth)
+    const pendingFactors = selectedFactors.map(id => {
+      const factor = allFactors.find(f => f.id === id);
+      return factor ? {
+        id: factor.id,
+        emoji: factor.emoji,
+        name: factor.label,
+        count: 0,
+        isCustom: factor.isCustom,
+      } : null;
+    }).filter(Boolean);
+    
+    localStorage.setItem("pending_tracked_factors", JSON.stringify(pendingFactors));
+    
+    // Also try to save directly if user ID exists (for users who are already authenticated)
+    const userId = localStorage.getItem("current_user_id");
+    if (userId) {
       initializeFactorsFromOnboarding(selectedFactors, allFactors);
     }
+    
     onContinue(selectedFactors);
   };
 

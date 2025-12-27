@@ -1,0 +1,212 @@
+TASK: Apply the SAME logic for REGISTERED users as for ANONYMOUS users. No exceptions.
+
+The system must behave IDENTICALLY whether a user is:
+
+anonymous
+
+newly registered
+
+existing signed-in user
+
+Registration must NOT change subscription or trial behavior.
+
+1. UNIFIED USER MODEL (CRITICAL)
+
+There must be ONE logical flow for:
+
+anonymous users
+
+registered users
+
+Registration ONLY does this:
+
+attaches data to a user account
+
+enables cross-device sync
+
+❌ Registration must NEVER:
+
+upgrade a plan
+
+start a trial
+
+mark Pro
+
+reset onboarding
+
+wipe tracking data
+
+2. FREE TRIAL RULES (APPLY TO REGISTERED USERS TOO)
+
+If a REGISTERED user selects Free Trial:
+
+plan_type = "trial"
+
+is_paid = false
+
+is_pro = false
+
+UI must show:
+
+“Free Trial”
+
+UI must NOT show:
+
+“Pro Member”
+
+❌ Registration + Free Trial ≠ Pro
+❌ Login must NOT auto-upgrade trial users
+
+3. TRACKING FACTORS (REGISTERED USERS BUG FIX)
+
+Tracking factors selected during onboarding MUST:
+
+persist for:
+
+anonymous users
+
+newly registered users
+
+logged-in users
+
+appear in:
+
+Journal
+
+Tracking
+
+Insights
+
+❌ Registration must NOT:
+
+clear factors
+
+fail to save factors
+
+skip factor persistence
+
+If a user:
+
+selects factors
+
+then registers
+
+→ those factors MUST still exist.
+
+4. AUTH & ONBOARDING FLOW (STRICT)
+Existing registered users:
+
+login → Journal
+
+NEVER see onboarding
+
+NEVER see paywall unless subscription expired
+
+New registered users:
+
+onboarding → auth → paywall → journal
+
+Anonymous users:
+
+onboarding → (trial OR pay) → journal
+
+registration optional and later
+
+❌ No duplicate onboarding
+❌ No forced signup
+❌ No repeated paywalls
+
+5. PAYWALL BEHAVIOR (REGISTERED = ANONYMOUS)
+
+Paywall must behave the same for:
+
+anonymous users
+
+registered users
+
+Plans:
+
+Free Trial
+
+Monthly
+
+Annual
+
+Lifetime
+
+Actions:
+
+Free Trial → backend trial start
+
+Paid → Paystack redirect
+
+❌ Registration status must NOT change plan logic
+
+6. SUBSCRIPTION & TRIAL SOURCE OF TRUTH
+
+Backend database is the ONLY authority for:
+
+trial active / expired
+
+subscription active / expired
+
+plan type
+
+Frontend:
+
+must always fetch status
+
+must never infer
+
+❌ localStorage is cache ONLY
+
+7. UI LABEL FIX (REGISTERED USERS TOO)
+
+Fix labels globally:
+
+plan_type === "trial" → show Free Trial
+
+paid plans only → show Pro Member
+
+❌ Never show “Pro Member” for trial users
+❌ Never show Pro just because user is registered
+
+8. REQUIRED TESTS (DO NOT SKIP)
+
+Verify ALL:
+
+Registered → Free Trial → NOT Pro
+
+Registered → Free Trial → factors saved
+
+Registered → login → journal directly
+
+Registered → trial expired → paywall
+
+Registered → paid → Pro
+
+FINAL RULE
+
+Registration is identity only — NOT entitlement.
+
+Do NOT auto-upgrade.
+Do NOT auto-start trials.
+Do NOT wipe data.
+
+Implement ONLY what is required to satisfy these rules.
+
+🧠 Why this prompt matters
+
+This removes the root cause of your bugs:
+
+❌ “Registered = Pro”
+
+❌ “Trial magically becomes paid”
+
+❌ “Factors disappear after signup”
+
+❌ “Different logic per user type”
+
+After this, your system becomes:
+
+One flow. One truth. One rule set.
