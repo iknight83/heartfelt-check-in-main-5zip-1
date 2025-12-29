@@ -1,0 +1,108 @@
+IMPORTANT: READ CAREFULLY AND FOLLOW STRICTLY
+
+I want to turn my existing web app into a downloadable app WITHOUT changing any existing functionality, logic, flows, or backend behavior.
+
+❗ HARD RULES (DO NOT VIOLATE)
+
+❌ Do NOT modify payment logic (Paystack)
+
+❌ Do NOT modify authentication (Supabase)
+
+❌ Do NOT modify onboarding flow
+
+❌ Do NOT change subscription, trial, or access logic
+
+❌ Do NOT refactor components, hooks, or APIs
+
+❌ Do NOT remove or rename routes
+
+❌ Do NOT touch database schema
+
+The app is already working correctly.
+Your job is ONLY to package it as an installable app.
+
+🎯 GOAL
+
+Convert the app into a Progressive Web App (PWA) that:
+
+Can be installed on mobile and desktop
+
+Opens in full-screen (no browser UI)
+
+Uses an app icon and splash screen
+
+Preserves ALL existing behavior
+
+✅ TASKS YOU ARE ALLOWED TO DO
+
+Add a manifest.json
+
+Add PWA icons (use existing logo — do not redesign)
+
+Register a service worker (basic, safe defaults only)
+
+Set theme color & background color
+
+Enable “Add to Home Screen”
+
+Ensure Paystack redirects still work correctly
+
+📱 PWA CONFIG REQUIREMENTS
+
+App Name: STATE
+
+Short Name: STATE
+
+Description: A calm, psychology-focused mood tracking app
+
+Display mode: standalone
+
+Orientation: portrait
+
+Start URL: /
+
+Scope: /
+
+Theme color: dark blue / midnight (match UI)
+
+Background color: same as theme
+
+🔒 SAFETY REQUIREMENTS
+
+Do NOT add new auth checks
+
+Do NOT introduce new redirects
+
+Do NOT gate features differently
+
+Do NOT add login prompts
+
+Do NOT alter free trial or subscription logic
+
+🧪 FINAL STEP
+
+After implementing PWA support:
+
+Confirm app still runs exactly the same
+
+Confirm Paystack payments still redirect correctly
+
+Confirm onboarding works unchanged
+
+Confirm existing users still go directly to Journal
+
+If ANY functionality would be affected, STOP and ASK before proceeding.
+
+Proceed carefully and conservatively.
+
+🧠 WHY THIS PROMPT WORKS
+
+It locks Replit’s scope
+
+It prevents “helpful” refactors
+
+It treats your app as production-ready
+
+It focuses on packaging, not logic
+
+This is how senior devs talk to build agents.
