@@ -1,0 +1,191 @@
+✅ PWA VERIFICATION CHECKLIST (NO LOGIC CHANGES)
+1️⃣ Project Structure Check
+
+Confirm only these NEW files were added (or equivalents):
+
+✅ /public/manifest.json
+
+✅ /public/sw.js (or root sw.js)
+
+✅ App icon files (.png or .svg)
+
+❌ No existing files deleted
+
+❌ No existing files renamed
+
+👉 Nothing else should change
+
+2️⃣ manifest.json MUST Contain
+
+Verify exact values (not “similar”):
+
+{
+  "name": "STATE",
+  "short_name": "STATE",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#1e1b4b",
+  "background_color": "#1e1b4b"
+}
+
+
+Checklist:
+
+✅ display = standalone
+
+✅ start_url = /
+
+✅ scope = /
+
+✅ orientation = portrait
+
+✅ icons array exists
+
+❌ No external URLs
+
+❌ No auth or routing logic inside manifest
+
+3️⃣ Service Worker (sw.js) SAFETY CHECK
+
+The service worker must:
+
+✅ ALLOW:
+
+Static assets (JS, CSS, icons)
+
+Offline fallback
+
+❌ MUST NOT:
+
+Cache Paystack URLs
+
+Cache Supabase auth endpoints
+
+Intercept POST requests
+
+Modify headers
+
+Redirect requests
+
+Ask Replit to confirm explicitly:
+
+“List the exact URL patterns excluded from caching.”
+
+4️⃣ index.html Changes Check
+
+Verify ONLY these were added:
+
+<link rel="manifest" href="/manifest.json">
+
+<meta name="theme-color">
+
+Apple PWA meta tags
+
+Service worker registration script
+
+❌ Confirm:
+
+No routing logic added
+
+No auth logic added
+
+No redirects added
+
+No script order changes affecting app
+
+5️⃣ INSTALL TEST (CRITICAL)
+
+Replit must confirm ALL of these work:
+
+Desktop
+
+✅ Chrome shows “Install App”
+
+✅ App opens without browser UI
+
+✅ Refresh works
+
+✅ Paystack redirect still works
+
+Mobile (Android)
+
+✅ “Add to Home Screen” available
+
+✅ Opens full-screen
+
+✅ No address bar
+
+✅ Payment flow still works
+
+iOS (Safari)
+
+✅ Add to Home Screen
+
+✅ Standalone mode
+
+⚠️ (No push notifications expected yet)
+
+6️⃣ PAYMENT FLOW REGRESSION TEST
+
+This MUST still work:
+
+✅ Free Trial → onboarding → journal
+
+✅ Paid → Paystack → return → unlock
+
+✅ Returning user → journal directly
+
+❌ No payment blocked by SW
+
+❌ No redirect loops
+
+Ask Replit:
+
+“Confirm Paystack URLs are NOT cached or intercepted.”
+
+7️⃣ AUTH & DATA SAFETY CHECK
+
+Confirm explicitly:
+
+✅ Supabase auth unchanged
+
+✅ No new auth guards added
+
+✅ No forced login prompts
+
+✅ User history persists
+
+✅ Anonymous logic unchanged
+
+8️⃣ FINAL YES / NO QUESTIONS (IMPORTANT)
+
+Ask Replit to answer YES or NO only:
+
+Did you modify ANY existing React component logic?
+
+Did you modify ANY backend API?
+
+Did you modify ANY subscription logic?
+
+Did you modify ANY onboarding step?
+
+Did you modify ANY auth behavior?
+
+Expected answer:
+NO to all
+
+🧠 WHY THIS CHECKLIST MATTERS
+
+PWAs can silently break payments if misconfigured
+
+Service workers are dangerous if too aggressive
+
+This checklist guarantees:
+
+No logic regression
+
+Safe app install
+
+Store-ready foundation
