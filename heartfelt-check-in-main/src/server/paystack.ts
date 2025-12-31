@@ -255,7 +255,6 @@ const activateSubscription = async (userId: string, plan: PlanType, paymentId: n
 router.post("/initiate", async (req, res) => {
   console.log("=== PAYSTACK INITIATE ===");
   console.log("Request body:", JSON.stringify(req.body, null, 2));
-  console.log("PAYSTACK_SECRET_KEY configured:", !!PAYSTACK_SECRET_KEY);
   
   try {
     if (!PAYSTACK_SECRET_KEY) {
