@@ -1,0 +1,128 @@
+🔴 The Problem (Plain English)
+
+You have two ways to reach Register:
+
+From the start screen → works ✅
+
+From the Sign-In page (“Don’t have an account? Register”) → ❌ goes to 404 Page Not Found
+
+That means:
+
+👉 The Register button on the Sign-In page links to a route that does not exist
+or
+👉 It uses a different path than the working Register route.
+
+This is 100% a frontend routing issue, not auth, not Supabase, not PWA.
+
+🧠 Why This Happens (Technical but Simple)
+
+One of these is true (very common in React apps):
+
+Start screen uses:
+
+navigate("/register")
+
+
+Sign-in page uses:
+
+navigate("/auth/register")
+
+
+or
+
+<a href="/register">
+
+
+while the actual route is /signup
+
+OR:
+
+The Register page only exists inside onboarding routing
+
+The Sign-In page is outside onboarding, so /register isn’t mounted there
+
+Result → 404
+
+✅ What the Correct Behavior Should Be
+
+You already described it perfectly. This is the correct UX logic:
+
+✅ Expected Flow
+
+If user clicks “Register” anywhere
+→ they should always land on the SAME Register page
+
+No matter if they came from:
+
+Start screen
+
+Sign-in screen
+
+Onboarding
+
+No 404s, ever
+
+🛠️ EXACT PROMPT TO GIVE REPLIT (COPY–PASTE)
+
+Use this exact prompt 👇
+(It is strict, clear, and prevents Replit from breaking logic)
+
+🔧 Replit Fix Prompt
+
+Fix routing bug without changing any auth, onboarding, subscription, or payment logic.
+
+Problem:
+
+The “Register” link on the Sign-In page navigates to a non-existent route, causing a 404 Page Not Found.
+
+The “Register” button on the start screen works correctly, so routing is inconsistent.
+
+Required fixes:
+
+Identify the exact route used by the working Register flow.
+
+Update the Sign-In page “Register” link to navigate to that same route.
+
+Ensure all Register actions across the app point to ONE canonical register route.
+
+Do not create new pages.
+
+Do not rename existing routes.
+
+Do not change authentication, onboarding, subscription, trial, or payment logic.
+
+Do not change UI or styling.
+
+Acceptance criteria:
+
+Clicking “Register” from:
+
+Start screen ✅
+
+Sign-In page ✅
+
+Always loads the Register page
+
+Never results in a 404
+
+This is a routing consistency fix only.
+
+🔍 How You Can Verify It After the Fix
+
+Test this exact sequence:
+
+Open app
+
+Click Sign in
+
+Click Register at the bottom
+✅ Should open Register page
+
+Use browser back
+
+From start screen click Register
+✅ Same page, same URL
+
+No 404 anywhere
+
+If all pass → bug is fully resolved

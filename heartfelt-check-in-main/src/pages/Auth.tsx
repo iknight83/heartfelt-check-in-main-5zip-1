@@ -15,9 +15,10 @@ interface AuthProps {
   mode: "signin" | "signup";
   onBack: () => void;
   onSuccess: () => void;
+  onToggleMode?: () => void;
 }
 
-const Auth = ({ mode, onBack, onSuccess }: AuthProps) => {
+const Auth = ({ mode, onBack, onSuccess, onToggleMode }: AuthProps) => {
   const navigate = useNavigate();
   const { signInWithEmail, signUpWithEmail, resetPassword } = useAuth();
   const [email, setEmail] = useState("");
@@ -305,7 +306,7 @@ const Auth = ({ mode, onBack, onSuccess }: AuthProps) => {
           <p className="text-soft text-sm">
             {mode === "signin" ? "Don't have an account? " : "Already have an account? "}
             <button
-              onClick={() => navigate(mode === "signin" ? "/auth/signup" : "/auth/signin")}
+              onClick={onToggleMode}
               className="text-primary hover:text-primary/80 font-medium transition-colors"
             >
               {mode === "signin" ? "Register" : "Sign in"}

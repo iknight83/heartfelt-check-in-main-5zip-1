@@ -58,6 +58,10 @@ const JourneyAuthScreen = ({ onContinue, onRegister, onBack }: JourneyAuthScreen
     onContinue("email");
   };
 
+  const handleToggleAuthMode = () => {
+    setAuthMode(authMode === "email-signin" ? "email-signup" : "email-signin");
+  };
+
   // Show email auth screen
   if (authMode === "email-signin" || authMode === "email-signup") {
     return (
@@ -65,6 +69,7 @@ const JourneyAuthScreen = ({ onContinue, onRegister, onBack }: JourneyAuthScreen
         mode={authMode === "email-signin" ? "signin" : "signup"}
         onBack={() => setAuthMode("main")}
         onSuccess={handleEmailSuccess}
+        onToggleMode={handleToggleAuthMode}
       />
     );
   }
