@@ -19,6 +19,7 @@ interface UseSubscriptionResult {
   status: SubscriptionStatus;
   isTrialActive: boolean;
   isSubscribed: boolean;
+  isProActive: boolean;
   isExpired: boolean;
   isLoading: boolean;
   plan: string | null;
@@ -251,6 +252,14 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
     })());
   }, [checkBackendSubscription, syncLocalStorage, isSubscribed, trialStartTime]);
 
+  const isProActive = useMemo(() => {
+    if (!isSubscribed) return false;
+    if (isLifetime) return true;
+    if (!expiresAt) return false;
+    const now = new Date();
+    return expiresAt > now;
+  }, [isSubscribed, isLifetime, expiresAt]);
+
   const subscriptionDetails = useMemo(() => {
     if (isLoading) {
       return {
@@ -264,7 +273,7 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
       };
     }
 
-    if (isSubscribed) {
+    if (isProActive) {
       return {
         status: "subscribed" as SubscriptionStatus,
         isTrialActive: false,
@@ -273,6 +282,18 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
         trialDaysUsed: uniqueCheckInDays,
         maxAllowedConfidence: "Strong" as const,
         canGenerateNewPatterns: true,
+      };
+    }
+
+    if (isSubscribed && !isProActive) {
+      return {
+        status: "expired" as SubscriptionStatus,
+        isTrialActive: false,
+        isExpired: true,
+        trialDaysRemaining: 0,
+        trialDaysUsed: uniqueCheckInDays,
+        maxAllowedConfidence: "Emerging" as const,
+        canGenerateNewPatterns: false,
       };
     }
 
@@ -299,7 +320,7 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
       maxAllowedConfidence: "Emerging" as const,
       canGenerateNewPatterns: isTrialActive,
     };
-  }, [isLoading, isSubscribed, trialStartTime, uniqueCheckInDays]);
+  }, [isLoading, isSubscribed, isProActive, trialStartTime, uniqueCheckInDays]);
 
   const subscribe = (planType?: "monthly" | "annual" | "lifetime") => {
     const subscriptionKey = getUserStorageKey(SUBSCRIPTION_KEY);
@@ -321,6 +342,7 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
   return {
     ...subscriptionDetails,
     isSubscribed,
+    isProActive,
     isLoading,
     plan,
     expiresAt,
