@@ -4,7 +4,6 @@ import CheckInScreen from "@/components/CheckInScreen";
 import DurationScreen from "@/components/DurationScreen";
 import SupportCheckScreen from "@/components/SupportCheckScreen";
 import JourneyAuthScreen from "@/components/JourneyAuthScreen";
-import ReminderScreen from "@/components/ReminderScreen";
 import FactorSelectionScreen from "@/components/FactorSelectionScreen";
 import PaywallScreen from "@/components/PaywallScreen";
 import { useAuth } from "@/hooks/useAuth";
@@ -16,13 +15,12 @@ interface UserSelections {
   hasSupport: boolean | null;
   skippedEmotions: boolean;
   authMethod: "google" | "apple" | "anonymous" | "email" | null;
-  reminderTime: string | null;
   trackingFactors: string[] | null;
   selectedPlan: "lifetime" | "annual" | "monthly" | "trial" | null;
   pendingPaymentRef: string | null;
 }
 
-type OnboardingStep = "emotions" | "duration" | "support" | "factorSelection" | "auth" | "paywall" | "reminder";
+type OnboardingStep = "emotions" | "duration" | "support" | "factorSelection" | "auth" | "paywall";
 
 const Index = () => {
   const navigate = useNavigate();
@@ -38,7 +36,6 @@ const Index = () => {
     hasSupport: null,
     skippedEmotions: false,
     authMethod: null,
-    reminderTime: null,
     trackingFactors: null,
     selectedPlan: null,
     pendingPaymentRef: null,
@@ -87,11 +84,6 @@ const Index = () => {
       localStorage.setItem(`termsAcceptedAt__${userId}`, new Date().toISOString());
       navigate("/home", { replace: true });
       return;
-    }
-    
-    const continueStep = searchParams.get("continue");
-    if (continueStep === "reminder") {
-      setStep("reminder");
     }
     
     setCheckingAccess(false);
@@ -164,7 +156,7 @@ const Index = () => {
       } catch (error) {
         console.error("Failed to start trial:", error);
       }
-      setStep("reminder");
+      completeOnboarding();
       return;
     }
 
@@ -187,16 +179,6 @@ const Index = () => {
     } catch (error) {
       console.error("Payment error:", error);
     }
-  };
-
-  const handleReminderEnable = (time: string) => {
-    setSelections((prev) => ({ ...prev, reminderTime: time }));
-    completeOnboarding();
-  };
-
-  const handleReminderSkip = () => {
-    setSelections((prev) => ({ ...prev, reminderTime: null }));
-    completeOnboarding();
   };
 
   const completeOnboarding = () => {
@@ -263,10 +245,6 @@ const Index = () => {
 
   if (step === "paywall") {
     return <PaywallScreen onContinue={handlePaywallContinue} onRestore={handleRestorePurchases} />;
-  }
-
-  if (step === "reminder") {
-    return <ReminderScreen onEnable={handleReminderEnable} onSkip={handleReminderSkip} onBack={() => setStep("paywall")} />;
   }
 
   return null;
