@@ -109,7 +109,7 @@ export const ContextQualityWarning = ({
             {/* CTA button */}
             {(isHighPriority || !hasAnyMoods) && (
               <button
-                onClick={() => navigate("/mood-detail")}
+                onClick={() => navigate("/mood")}
                 className="mt-3 px-3 py-1.5 rounded-lg bg-accent/20 border border-accent/30 text-accent text-[11px] font-medium hover:bg-accent/30 transition-all duration-200"
               >
                 Log mood with context
