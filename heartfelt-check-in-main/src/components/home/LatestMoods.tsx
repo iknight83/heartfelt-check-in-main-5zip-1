@@ -67,63 +67,69 @@ const LatestMoods = ({ moods, onDelete, selectedDate }: LatestMoodsProps) => {
   return (
     <div className="space-y-4">
       <h3 className="text-xl font-bold text-foreground">Daily check in</h3>
-      <div className="space-y-2">
-        {moods.length === 0 ? (
+      
+      {moods.length === 0 ? (
+        <button
+          onClick={handleAddNew}
+          className="w-full flex flex-col items-center justify-center gap-4 py-10 px-6 rounded-3xl bg-gradient-to-br from-accent/20 via-accent/10 to-primary/10 border-2 border-accent/40 hover:border-accent/60 hover:from-accent/25 hover:via-accent/15 hover:to-primary/15 transition-all duration-300 shadow-lg shadow-accent/10 hover:shadow-accent/20 active:scale-[0.98]"
+        >
+          <div className="w-20 h-20 rounded-full bg-accent/20 border-2 border-accent/50 flex items-center justify-center">
+            <Plus className="w-10 h-10 text-accent" strokeWidth={2.5} />
+          </div>
+          <div className="text-center space-y-1">
+            <p className="text-lg font-semibold text-foreground">How are you feeling?</p>
+            <p className="text-sm text-muted-foreground">Tap to check in today</p>
+          </div>
+        </button>
+      ) : (
+        <div className="space-y-3">
+          {moods.map((entry) => (
+            <div
+              key={entry.id}
+              className="flex items-center gap-2"
+            >
+              <button
+                onClick={() => handleMoodClick(entry)}
+                className="flex-1 flex items-center justify-between p-5 rounded-2xl bg-card/50 backdrop-blur-sm border border-border/30 hover:bg-card/70 transition-all duration-200 group"
+              >
+                <div className="flex flex-col items-start gap-1">
+                  <span 
+                    className="text-xl font-bold"
+                    style={{ color: getMoodColor(entry.mood) }}
+                  >
+                    {entry.mood}
+                  </span>
+                  {entry.triggers && entry.triggers.length > 0 && (
+                    <span className="text-sm text-muted-foreground">
+                      {entry.triggers.join(", ")}
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground text-sm">{entry.time}</span>
+                  <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                </div>
+              </button>
+              <button
+                onClick={(e) => handleDelete(e, entry.id)}
+                className="p-3 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+          
           <button
             onClick={handleAddNew}
-            className="w-full flex items-center justify-center gap-2 p-4 rounded-2xl bg-card/50 backdrop-blur-sm border border-dashed border-border/50 hover:bg-card/70 hover:border-accent/50 transition-all duration-200 text-muted-foreground hover:text-foreground"
+            className="w-full flex items-center justify-center gap-3 py-4 px-5 rounded-2xl bg-accent/10 border border-accent/30 hover:bg-accent/20 hover:border-accent/50 transition-all duration-200 active:scale-[0.98]"
           >
-            <Plus className="w-5 h-5" />
-            <span>Add your first check in</span>
+            <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center">
+              <Plus className="w-5 h-5 text-accent" strokeWidth={2.5} />
+            </div>
+            <span className="text-accent font-medium">Add another check in</span>
           </button>
-        ) : (
-          <>
-            {moods.map((entry) => (
-              <div
-                key={entry.id}
-                className="flex items-center gap-2"
-              >
-                <button
-                  onClick={() => handleMoodClick(entry)}
-                  className="flex-1 flex items-center justify-between p-5 rounded-2xl bg-card/50 backdrop-blur-sm border border-border/30 hover:bg-card/70 transition-all duration-200 group"
-                >
-                  <div className="flex flex-col items-start gap-1">
-                    <span 
-                      className="text-xl font-bold"
-                      style={{ color: getMoodColor(entry.mood) }}
-                    >
-                      {entry.mood}
-                    </span>
-                    {entry.triggers && entry.triggers.length > 0 && (
-                      <span className="text-sm text-muted-foreground">
-                        {entry.triggers.join(", ")}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-muted-foreground text-sm">{entry.time}</span>
-                    <ChevronRight className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
-                  </div>
-                </button>
-                <button
-                  onClick={(e) => handleDelete(e, entry.id)}
-                  className="p-3 rounded-xl text-muted-foreground hover:text-destructive hover:bg-destructive/10 transition-all duration-200"
-                >
-                  <Trash2 className="w-4 h-4" />
-                </button>
-              </div>
-            ))}
-            {/* Add another check-in button */}
-            <button
-              onClick={handleAddNew}
-              className="w-full flex items-center justify-center gap-2 p-3 rounded-2xl bg-card/30 backdrop-blur-sm border border-dashed border-border/30 hover:bg-card/50 hover:border-accent/50 transition-all duration-200 text-muted-foreground/70 hover:text-foreground text-sm"
-            >
-              <Plus className="w-4 h-4" />
-              <span>Add another check in</span>
-            </button>
-          </>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 };
