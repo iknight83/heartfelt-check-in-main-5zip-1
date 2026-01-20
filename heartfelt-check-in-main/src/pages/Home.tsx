@@ -1,10 +1,11 @@
-import { useState, useEffect, useMemo } from "react";
-import { format, isSameDay } from "date-fns";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { isSameDay } from "date-fns";
 import DateIndicator from "@/components/home/DateIndicator";
 import FactorsList from "@/components/home/FactorsList";
 import BottomNav from "@/components/home/BottomNav";
 import AddFactorModal from "@/components/home/AddFactorModal";
 import LatestMoods from "@/components/home/LatestMoods";
+import HomeSkeleton from "@/components/home/HomeSkeleton";
 import { getMoodHistory, deleteMoodFromHistory, MoodEntry } from "@/hooks/useMoodState";
 import { useTrackedFactors, ALL_AVAILABLE_FACTORS } from "@/hooks/useTrackedFactors";
 import { useAuth } from "@/hooks/useAuth";
@@ -12,20 +13,19 @@ import { useAuth } from "@/hooks/useAuth";
 type NavTab = "home" | "insights" | "you";
 
 const Home = () => {
-  const { user, loading } = useAuth();
+  const { loading: authLoading } = useAuth();
   const [activeTab, setActiveTab] = useState<NavTab>("home");
   const [showAddFactorModal, setShowAddFactorModal] = useState(false);
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [moodHistory, setMoodHistory] = useState<MoodEntry[]>([]);
-  const [isReady, setIsReady] = useState(false); // Track if data is ready to load
+  const [isReady, setIsReady] = useState(false);
+  const hasLoadedData = useRef(false);
   const { factors, incrementFactor, decrementFactor, addFactor } = useTrackedFactors(selectedDate);
 
-  // Get factors that are not yet being tracked
   const availableFactors = ALL_AVAILABLE_FACTORS.filter(
     (af) => !factors.some((f) => f.id === af.id)
   );
 
-  // Filter moods for the selected date
   const filteredMoods = useMemo(() => {
     return moodHistory.filter((mood) => {
       const moodDate = new Date(mood.timestamp);
@@ -33,35 +33,35 @@ const Home = () => {
     });
   }, [moodHistory, selectedDate]);
 
-  // Wait for auth to complete and user ID to be available before loading data
+  const loadUserData = useCallback(() => {
+    const userId = localStorage.getItem("current_user_id");
+    if (userId) {
+      setMoodHistory(getMoodHistory());
+      hasLoadedData.current = true;
+      setIsReady(true);
+      return true;
+    }
+    return false;
+  }, []);
+
   useEffect(() => {
-    if (loading) return;
+    if (loadUserData()) return;
     
-    // Poll for user ID availability
-    const checkAndLoad = () => {
-      const userId = localStorage.getItem("current_user_id");
-      if (userId) {
-        setMoodHistory(getMoodHistory());
-        setIsReady(true);
-        return true;
-      }
-      return false;
-    };
-    
-    // Try immediately
-    if (checkAndLoad()) return;
-    
-    // Poll until user ID is available (handles async auth)
     const interval = setInterval(() => {
-      if (checkAndLoad()) {
+      if (loadUserData()) {
         clearInterval(interval);
       }
-    }, 100);
+    }, 50);
     
     return () => clearInterval(interval);
-  }, [loading]);
+  }, [loadUserData]);
 
-  // Refresh mood data when page gains focus
+  useEffect(() => {
+    if (!authLoading && !hasLoadedData.current) {
+      loadUserData();
+    }
+  }, [authLoading, loadUserData]);
+
   useEffect(() => {
     const handleFocus = () => {
       const userId = localStorage.getItem("current_user_id");
@@ -100,13 +100,8 @@ const Home = () => {
     setMoodHistory(getMoodHistory());
   };
 
-  // Show loading state until data is ready
-  if (loading || !isReady) {
-    return (
-      <div className="min-h-screen gradient-bg flex items-center justify-center">
-        <div className="text-soft animate-pulse">Loading...</div>
-      </div>
-    );
+  if (!isReady) {
+    return <HomeSkeleton />;
   }
 
   return (

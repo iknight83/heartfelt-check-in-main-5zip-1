@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useLayoutEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import CheckInScreen from "@/components/CheckInScreen";
 import DurationScreen from "@/components/DurationScreen";
@@ -6,6 +6,7 @@ import SupportCheckScreen from "@/components/SupportCheckScreen";
 import JourneyAuthScreen from "@/components/JourneyAuthScreen";
 import FactorSelectionScreen from "@/components/FactorSelectionScreen";
 import PaywallScreen from "@/components/PaywallScreen";
+import OnboardingSkeleton from "@/components/OnboardingSkeleton";
 import { useAuth } from "@/hooks/useAuth";
 import { useSubscription } from "@/hooks/useSubscription";
 
@@ -40,6 +41,17 @@ const Index = () => {
     selectedPlan: null,
     pendingPaymentRef: null,
   });
+
+  useLayoutEffect(() => {
+    const userId = localStorage.getItem("current_user_id");
+    if (userId) {
+      const hasCompletedOnboarding = !!localStorage.getItem(`termsAcceptedAt__${userId}`) || 
+                                      !!localStorage.getItem("termsAcceptedAt");
+      if (hasCompletedOnboarding) {
+        navigate("/home", { replace: true });
+      }
+    }
+  }, [navigate]);
 
   useEffect(() => {
     if (authLoading) return;
@@ -210,12 +222,7 @@ const Index = () => {
   };
 
   if (authLoading || checkingAccess) {
-    return (
-      <div className="min-h-screen gradient-bg flex flex-col items-center justify-center px-6">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-        <p className="text-foreground text-lg">Loading...</p>
-      </div>
-    );
+    return <OnboardingSkeleton />;
   }
 
   if (step === "emotions") {
