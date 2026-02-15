@@ -144,8 +144,20 @@ The Free Trial option on the Paywall follows strict eligibility rules:
 ### Authentication & Backend
 - **Supabase**: Authentication (email, anonymous), with potential for database storage (currently localStorage-focused)
 
-### Mobile Capabilities
-- **Capacitor**: Native mobile app wrapper with local notifications plugin for reminder functionality
+### Mobile Capabilities (iOS via Capacitor - Jan 2026)
+- **Capacitor**: Native mobile app wrapper for iOS distribution
+  - **App ID**: `com.knightleeron.state`
+  - **App Name**: `STATE`
+  - **Web Dir**: `dist` (Vite production build output)
+  - **Config**: `capacitor.config.ts` in project root
+  - **iOS Project**: `ios/` folder with Xcode project
+  - **Build & Sync Flow** (on macOS):
+    1. `npm install`
+    2. `npm run build`
+    3. `npx cap sync`
+    4. `npx cap open ios` (opens Xcode)
+    5. Set signing team and bundle ID in Xcode
+    6. Archive and upload to App Store Connect
 
 ### UI Libraries
 - **Radix UI**: Accessible, unstyled component primitives (dialog, popover, dropdown, tabs, etc.)
