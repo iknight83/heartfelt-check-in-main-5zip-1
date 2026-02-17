@@ -25,7 +25,7 @@ const basePlans: Plan[] = [
   {
     id: "lifetime",
     name: "Lifetime Access",
-    price: "R999",
+    price: "$59.99",
     period: "once-off",
     subtext: "For long-term self-understanding.",
     badge: "Best value",
@@ -34,14 +34,14 @@ const basePlans: Plan[] = [
   {
     id: "annual",
     name: "Annual Access",
-    price: "R349",
+    price: "$21.99",
     period: "/ year",
-    subtext: "Just R29 per month",
+    subtext: "Just $1.83 per month",
   },
   {
     id: "monthly",
     name: "Monthly Access",
-    price: "R49",
+    price: "$2.99",
     period: "/ month",
     subtext: "Cancel anytime",
   },
@@ -65,7 +65,7 @@ const PaywallScreen = ({ onContinue, onRestore }: PaywallScreenProps) => {
     ...(showFreeTrial ? [{
       id: "trial" as PlanType,
       name: "Free Trial",
-      price: "R0",
+      price: "$0",
       period: "/ 7 days",
       subtext: "Try all features free",
       isTrial: true,

@@ -4,7 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 
 const syncSubscriptionFromBackend = async (userId: string) => {
   try {
-    const response = await fetch(`/api/paystack/subscription/${userId}`);
+    const response = await fetch(`/api/paypal/subscription/${userId}`);
     if (!response.ok) return;
     
     const data = await response.json();

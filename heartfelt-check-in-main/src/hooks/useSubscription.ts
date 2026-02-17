@@ -91,7 +91,7 @@ export const useSubscription = (providedUserId?: string): UseSubscriptionResult 
     if (!userId) return null;
 
     try {
-      const response = await fetch(`/api/paystack/subscription/${userId}`);
+      const response = await fetch(`/api/paypal/subscription/${userId}`);
       if (!response.ok) return null;
       
       const data = await response.json();

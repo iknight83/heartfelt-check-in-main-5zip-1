@@ -26,7 +26,7 @@ const plans: Plan[] = [
   {
     id: "lifetime",
     name: "Lifetime Access",
-    price: "R999",
+    price: "$59.99",
     period: "once-off",
     subtext: "For long-term self-understanding.",
     badge: "Best value",
@@ -35,14 +35,14 @@ const plans: Plan[] = [
   {
     id: "annual",
     name: "Annual Access",
-    price: "R349",
+    price: "$21.99",
     period: "/ year",
-    subtext: "Just R29 per month",
+    subtext: "Just $1.83 per month",
   },
   {
     id: "monthly",
     name: "Monthly Access",
-    price: "R49",
+    price: "$2.99",
     period: "/ month",
     subtext: "Cancel anytime",
   },
@@ -85,7 +85,7 @@ const Profile = () => {
       if (!userId) return;
 
       try {
-        const response = await fetch(`/api/paystack/subscription/${userId}`);
+        const response = await fetch(`/api/paypal/subscription/${userId}`);
         const data = await response.json();
         
         if (data.hasSubscription) {
@@ -101,7 +101,7 @@ const Profile = () => {
     checkServerSubscription();
   }, []);
 
-  const initiatePaystackPayment = async (plan: PlanType) => {
+  const initiatePayPalPayment = async (plan: PlanType) => {
     try {
       setIsProcessingPayment(true);
       
@@ -112,11 +112,11 @@ const Profile = () => {
         localStorage.setItem("is_anonymous_payment", "true");
       }
 
-      console.log("=== PAYSTACK INITIATE ===");
+      console.log("=== PAYPAL INITIATE ===");
       console.log("User ID:", userId);
       console.log("Plan:", plan);
 
-      const response = await fetch("/api/paystack/initiate", {
+      const response = await fetch("/api/paypal/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, plan }),
@@ -125,7 +125,7 @@ const Profile = () => {
       const data = await response.json();
 
       if (data.status === "ok" && data.authorizationUrl) {
-        console.log("=== PAYSTACK REDIRECT ===");
+        console.log("=== PAYPAL REDIRECT ===");
         console.log("Authorization URL:", data.authorizationUrl);
         
         localStorage.setItem("pending_payment_plan", plan);
@@ -143,7 +143,7 @@ const Profile = () => {
   };
 
   const handleSubscribe = () => {
-    initiatePaystackPayment(selectedPlan);
+    initiatePayPalPayment(selectedPlan);
   };
 
   const handleSignOut = async () => {

@@ -15,23 +15,23 @@ const PaymentSuccess = () => {
 
   useEffect(() => {
     const verifyPayment = async () => {
-      const transactionRef = searchParams.get("ref") || searchParams.get("reference") || searchParams.get("trxref");
+      const paypalOrderId = searchParams.get("token") || searchParams.get("ref") || searchParams.get("reference") || localStorage.getItem("pending_transaction_ref");
 
-      if (!transactionRef) {
-        setErrorMessage("Missing transaction reference");
+      if (!paypalOrderId) {
+        setErrorMessage("Missing payment reference");
         setState("failed");
         return;
       }
 
-      console.log("=== VERIFYING PAYSTACK PAYMENT ===");
-      console.log("Reference:", transactionRef);
+      console.log("=== VERIFYING PAYPAL PAYMENT ===");
+      console.log("Order ID:", paypalOrderId);
 
       try {
-        const response = await fetch("/api/paystack/verify", {
+        const response = await fetch("/api/paypal/verify", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            reference: transactionRef,
+            reference: paypalOrderId,
           }),
         });
 

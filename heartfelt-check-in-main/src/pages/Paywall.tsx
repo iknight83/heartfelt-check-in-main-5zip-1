@@ -16,9 +16,9 @@ interface PlanDetails {
 }
 
 const PLAN_DETAILS: Record<PaidPlanType, PlanDetails> = {
-  lifetime: { name: "Lifetime Access", price: "R999", period: "once-off" },
-  annual: { name: "Annual Access", price: "R349", period: "/ year" },
-  monthly: { name: "Monthly Access", price: "R49", period: "/ month" },
+  lifetime: { name: "Lifetime Access", price: "$59.99", period: "once-off" },
+  annual: { name: "Annual Access", price: "$21.99", period: "/ year" },
+  monthly: { name: "Monthly Access", price: "$2.99", period: "/ month" },
 };
 
 const Paywall = () => {
@@ -28,7 +28,7 @@ const Paywall = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [confirmingPlan, setConfirmingPlan] = useState<PaidPlanType | null>(null);
 
-  const initiatePaystackPayment = async (plan: PaidPlanType) => {
+  const initiatePayPalPayment = async (plan: PaidPlanType) => {
     try {
       setIsProcessing(true);
       
@@ -42,11 +42,11 @@ const Paywall = () => {
         return;
       }
       
-      console.log("=== PAYSTACK INITIATE ===");
+      console.log("=== PAYPAL INITIATE ===");
       console.log("User ID:", userId);
       console.log("Plan:", plan);
 
-      const response = await fetch("/api/paystack/initiate", {
+      const response = await fetch("/api/paypal/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, plan }),
@@ -58,7 +58,7 @@ const Paywall = () => {
       console.log("API Response Data:", JSON.stringify(data, null, 2));
 
       if (data.status === "ok" && data.authorizationUrl) {
-        console.log("=== PAYSTACK REDIRECT ===");
+        console.log("=== PAYPAL REDIRECT ===");
         console.log("Authorization URL:", data.authorizationUrl);
         console.log("Reference:", data.reference);
         
@@ -67,7 +67,7 @@ const Paywall = () => {
         
         window.location.href = data.authorizationUrl;
       } else {
-        console.error("=== PAYSTACK INITIATION FAILED ===");
+        console.error("=== PAYPAL INITIATION FAILED ===");
         console.error("Response data:", data);
         const errorMsg = data.message || data.error || "Failed to initiate payment";
         toast.error(errorMsg);
@@ -94,7 +94,7 @@ const Paywall = () => {
       
       try {
         setIsProcessing(true);
-        const response = await fetch("/api/paystack/trial/start", {
+        const response = await fetch("/api/paypal/trial/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId }),
@@ -123,7 +123,7 @@ const Paywall = () => {
 
   const handleConfirmPayment = () => {
     if (confirmingPlan) {
-      initiatePaystackPayment(confirmingPlan);
+      initiatePayPalPayment(confirmingPlan);
     }
   };
 
@@ -141,7 +141,7 @@ const Paywall = () => {
     try {
       setIsProcessing(true);
       
-      const response = await fetch(`/api/paystack/subscription/${userId}`);
+      const response = await fetch(`/api/paypal/subscription/${userId}`);
       const data = await response.json();
 
       if (data.hasSubscription) {
@@ -208,21 +208,21 @@ const Paywall = () => {
           <div className="w-full mb-6">
             <div className="flex items-center gap-2 mb-3">
               <Shield className="w-4 h-4 text-emerald-400" />
-              <span className="text-sm font-medium text-foreground">Secure Paystack Payment</span>
+              <span className="text-sm font-medium text-foreground">Secure PayPal Payment</span>
             </div>
             
             <div className="relative rounded-xl overflow-hidden border border-border/30 bg-gradient-to-br from-blue-600 to-blue-800 p-6">
               <div className="flex items-center gap-3 mb-4">
                 <CreditCard className="w-8 h-8 text-white" />
                 <div>
-                  <p className="text-white font-semibold">Paystack</p>
+                  <p className="text-white font-semibold">PayPal</p>
                   <p className="text-blue-200 text-sm">Secure Payment Gateway</p>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Lock className="w-4 h-4 text-emerald-300" />
                 <span className="text-sm text-blue-100">
-                  Your payment is protected by bank-level security
+                  Your payment is protected by PayPal's buyer protection
                 </span>
               </div>
             </div>
@@ -233,11 +233,11 @@ const Paywall = () => {
             <ul className="space-y-2 text-sm text-muted-foreground">
               <li className="flex items-start gap-2">
                 <ExternalLink className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
-                <span>You'll be redirected to Paystack to complete payment</span>
+                <span>You'll be redirected to PayPal to complete payment</span>
               </li>
               <li className="flex items-start gap-2">
                 <Shield className="w-4 h-4 mt-0.5 flex-shrink-0 text-primary" />
-                <span>We don't store your card details</span>
+                <span>We don't store your payment details</span>
               </li>
             </ul>
           </div>

@@ -152,7 +152,7 @@ const Index = () => {
 
     if (plan === "trial") {
       try {
-        const response = await fetch("/api/paystack/trial/start", {
+        const response = await fetch("/api/paypal/trial/start", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ userId }),
@@ -173,7 +173,7 @@ const Index = () => {
     }
 
     try {
-      const response = await fetch("/api/paystack/initiate", {
+      const response = await fetch("/api/paypal/initiate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId, plan }),
@@ -209,7 +209,7 @@ const Index = () => {
     if (!userId) return;
 
     try {
-      const response = await fetch(`/api/paystack/subscription/${userId}`);
+      const response = await fetch(`/api/paypal/subscription/${userId}`);
       const data = await response.json();
       if (data.hasSubscription) {
         localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");

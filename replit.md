@@ -47,57 +47,58 @@ All payments require authenticated users - no anonymous payments:
 
 ### Subscription System
 - **Trial Period**: 7-day free trial from first visit
-- **Plans**: Monthly (R49), Annual (R349), Lifetime (R999) subscription tiers
-- **Payment Provider**: Paystack (South African payment gateway)
+- **Plans**: Monthly ($2.99), Annual ($21.99), Lifetime ($59.99) subscription tiers — all in USD
+- **Payment Provider**: PayPal (global payment gateway, USD currency)
 - **Feature Gating**: Confidence levels for insights are restricted based on subscription status
+- **Currency Migration**: Migrated from Paystack (ZAR) to PayPal (USD) in Feb 2026 at ~R16=$1
 
-### Paystack Payment Integration (Dec 2025)
-The app uses Paystack for South African payment processing with a secure server-side implementation:
+### PayPal Payment Integration (Feb 2026)
+The app uses PayPal for payment processing with the @paypal/paypal-server-sdk:
 
 1. **Security Model**:
    - Server generates all transaction references (format: HFCHK-<timestamp>-<random>)
-   - Server controls pricing via PLAN_PRICES constant (stored in kobo: 100 kobo = R1)
-   - Mandatory HMAC SHA512 signature verification on all Paystack webhooks
-   - Rejects webhooks without valid signatures (400 response)
+   - Server controls pricing via PLAN_PRICES constant (stored as USD strings: "2.99", "21.99", "59.99")
+   - PayPal SDK handles authentication via client ID + secret
+   - Orders are created server-side and captured server-side after user approval
 
-2. **Database Tables** (PostgreSQL):
+2. **Database Tables** (PostgreSQL — same schema as before):
    - `payments`: transaction_reference (unique), user_id, plan, amount, status, verified_at
    - `subscriptions`: user_id (unique), plan, is_active, activated_at, expires_at, payment_id
    - `trials`: user_id (unique), started_at, expires_at (started_at + 7 days), is_active
 
-3. **Subscription Expiry Logic** (Dec 2025):
+3. **Subscription Expiry Logic**:
    - Lifetime subscriptions: expires_at = null (never expire)
    - Annual subscriptions: expires_at = activation date + 365 days
    - Monthly subscriptions: expires_at = activation date + 30 days
    - Backend auto-expires subscriptions when checking access (sets is_active=false if expired)
 
 4. **Payment Flow**:
-   - Client calls `/api/paystack/initiate` with userId and plan only
-   - Server creates payment record and calls Paystack API to initialize transaction
-   - Client redirects to Paystack's authorization_url (simple redirect, no form POST)
-   - Paystack calls `/api/paystack/webhook` with signed callback
-   - Server verifies HMAC signature BEFORE any state changes
-   - Server updates payment status and activates subscription
-   - Client returns to callback_url and verifies payment via `/api/paystack/verify`
+   - Client calls `/api/paypal/initiate` with userId and plan only
+   - Server creates payment record and calls PayPal API to create order
+   - Client redirects to PayPal's approval URL for user to authorize payment
+   - User approves payment on PayPal and is redirected back to callback URL
+   - Client calls `/api/paypal/verify` which captures the order and activates subscription
+   - No webhook needed — capture happens synchronously on verify
 
 5. **Environment Variables Required**:
-   - `PAYSTACK_SECRET_KEY`: Secret key from Paystack dashboard (starts with sk_)
+   - `PAYPAL_CLIENT_ID`: Client ID from PayPal developer dashboard
+   - `PAYPAL_CLIENT_SECRET`: Secret key from PayPal developer dashboard
 
 6. **API Endpoints**:
-   - `POST /api/paystack/initiate` - Creates payment and returns Paystack authorization URL
-   - `POST /api/paystack/webhook` - Receives Paystack webhooks (signature-verified)
-   - `POST /api/paystack/verify` - Verifies payment status with Paystack API
-   - `GET /api/paystack/subscription/:userId` - Check user's active subscription and trial status
-   - `POST /api/paystack/trial/start` - Start a 7-day free trial for a user
+   - `POST /api/paypal/initiate` - Creates PayPal order and returns approval URL
+   - `POST /api/paypal/verify` - Captures payment and activates subscription
+   - `GET /api/paypal/subscription/:userId` - Check user's active subscription and trial status
+   - `POST /api/paypal/trial/start` - Start a 7-day free trial for a user
+   - `GET /api/paypal/access/:userId` - Check if user has active subscription access
 
-7. **Testing Paystack Payments**:
-   - Use Paystack test secret key (starts with sk_test_)
-   - Test cards available in Paystack documentation
-   - Test flow: Paywall → Select plan → Paystack checkout → Success page
+7. **Testing PayPal Payments**:
+   - Use PayPal sandbox credentials (sandbox client ID + secret)
+   - Test accounts available in PayPal developer dashboard
+   - Test flow: Paywall → Select plan → PayPal checkout → Success page
    - Verify subscription activated: Check `subscriptions` table in database
    - Test restore: Click "Restore purchases" on paywall to sync from server
 
-8. **Subscription Sync on Login** (Dec 2025):
+8. **Subscription Sync on Login**:
    - Every login triggers `syncSubscriptionFromBackend()` to check backend status
    - Runs on `SIGNED_IN` and `TOKEN_REFRESHED` auth events
    - Also runs on `getSession()` for returning users with existing sessions
@@ -121,7 +122,7 @@ Existing users with active subscriptions or trials skip onboarding automatically
 
 1. **Access Check on Index**: Index.tsx checks both `termsAcceptedAt` AND subscription/trial status
 2. **Subscription Hook Reactivity**: `useSubscription` accepts userId parameter and refreshes subscription status
-3. **Backend as Source of Truth**: Subscription/trial check calls backend `/api/paystack/subscription/:userId`
+3. **Backend as Source of Truth**: Subscription/trial check calls backend `/api/paypal/subscription/:userId`
 4. **Trial = Active Access**: Users on active free trial are treated as having access (backend returns `hasActiveAccess=true`)
 5. **No Auto-Trial Creation**: Trials are only created when user explicitly starts one via paywall; no client-side fallback
 6. **Auto-Complete Onboarding**: If user has active access but no termsAcceptedAt, it's set automatically
@@ -136,7 +137,7 @@ The Free Trial option on the Paywall follows strict eligibility rules:
 4. **Backend Confirmation**: After backend check, hasEverUsedTrial is set based on `hasTrial` response
 5. **Show Free Trial**: Only when `!isSubscribed && hasEverUsedTrial === false`
 6. **Hide Free Trial**: When hasEverUsedTrial is null (loading/unknown) or true (trial already used)
-7. **Trial Start**: When user clicks Free Trial, frontend calls `/api/paystack/trial/start` to create trial record
+7. **Trial Start**: When user clicks Free Trial, frontend calls `/api/paypal/trial/start` to create trial record
 8. **Error Handling**: Network failures default to hiding trial (safe) and show error if user tries to start expired trial
 
 ## External Dependencies
