@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Check, User, Crown, Clock, Settings, Bell, Shield, Sparkles, Database, BarChart3, ChevronRight, HelpCircle, FileText, Scale, LogOut } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,45 +9,6 @@ import { useMoodData } from "@/hooks/useMoodData";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import BottomNav from "@/components/home/BottomNav";
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
-
-type PlanType = "lifetime" | "annual" | "monthly";
-
-interface Plan {
-  id: PlanType;
-  name: string;
-  price: string;
-  period: string;
-  subtext: string;
-  badge?: string;
-  isRecommended?: boolean;
-}
-
-const plans: Plan[] = [
-  {
-    id: "lifetime",
-    name: "Lifetime Access",
-    price: "$59.99",
-    period: "once-off",
-    subtext: "For long-term self-understanding.",
-    badge: "Best value",
-    isRecommended: true,
-  },
-  {
-    id: "annual",
-    name: "Annual Access",
-    price: "$21.99",
-    period: "/ year",
-    subtext: "Just $1.83 per month",
-  },
-  {
-    id: "monthly",
-    name: "Monthly Access",
-    price: "$2.99",
-    period: "/ month",
-    subtext: "Cancel anytime",
-  },
-];
 
 const features = [
   "See emotional patterns you can't notice day-to-day",
@@ -70,10 +31,7 @@ const getMoodColor = (average: number, hasData: boolean): string => {
 
 const Profile = () => {
   const navigate = useNavigate();
-  const [selectedPlan, setSelectedPlan] = useState<PlanType>("lifetime");
-  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [serverSubscribed, setServerSubscribed] = useState(false);
-  const [paypalClientId, setPaypalClientId] = useState<string | null>(null);
   const { isSubscribed: localSubscribed, isTrialActive, trialDaysUsed, subscribe } = useSubscription();
   const profileSummary = useProfileSummary();
   const { moodEntries } = useMoodData();
@@ -100,16 +58,7 @@ const Profile = () => {
       }
     };
 
-    const fetchClientId = async () => {
-      try {
-        const res = await fetch("/api/paypal/client-id");
-        const data = await res.json();
-        if (data.clientId) setPaypalClientId(data.clientId);
-      } catch {}
-    };
-
     checkServerSubscription();
-    fetchClientId();
   }, []);
 
   const handleSignOut = async () => {
@@ -167,15 +116,6 @@ const Profile = () => {
       emotionalRange,
     };
   }, [moodEntries]);
-
-  if (isProcessingPayment) {
-    return (
-      <div className="min-h-screen gradient-bg flex flex-col items-center justify-center px-6">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-        <p className="text-foreground text-lg">Processing payment...</p>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen gradient-bg pb-24">
@@ -461,7 +401,6 @@ const Profile = () => {
               </p>
             </div>
 
-            {/* Features */}
             <div className="space-y-2.5">
               {features.map((feature, index) => (
                 <div key={index} className="flex items-center gap-3">
@@ -473,130 +412,12 @@ const Profile = () => {
               ))}
             </div>
 
-            {/* Pricing Cards */}
-            <div className="space-y-3">
-              {plans.map((plan) => (
-                <button
-                  key={plan.id}
-                  onClick={() => setSelectedPlan(plan.id)}
-                  className={`w-full p-4 rounded-2xl border-2 transition-all duration-200 text-left relative ${
-                    selectedPlan === plan.id
-                      ? "border-primary bg-primary/10"
-                      : "border-border/30 bg-card/50 hover:border-border/50"
-                  }`}
-                >
-                  {plan.badge && (
-                    <span className="absolute -top-2.5 right-4 bg-primary text-primary-foreground text-xs font-medium px-2.5 py-0.5 rounded-full">
-                      {plan.badge}
-                    </span>
-                  )}
-                  
-                  <div className="flex items-center justify-between pl-8">
-                    <div>
-                      <span className="text-foreground font-medium">{plan.name}</span>
-                      <p className="text-muted-foreground text-sm mt-0.5">{plan.subtext}</p>
-                    </div>
-                    
-                    <div className="text-right">
-                      <div className="flex items-baseline gap-1">
-                        <span className="text-foreground font-semibold text-lg">{plan.price}</span>
-                        {plan.period !== "once-off" && (
-                          <span className="text-muted-foreground text-sm">{plan.period}</span>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Selection indicator */}
-                  <div className={`absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 rounded-full border-2 flex items-center justify-center transition-all ${
-                    selectedPlan === plan.id
-                      ? "border-primary bg-primary"
-                      : "border-border/50"
-                  }`}>
-                    {selectedPlan === plan.id && (
-                      <Check className="w-3 h-3 text-primary-foreground" />
-                    )}
-                  </div>
-                </button>
-              ))}
-            </div>
-
-            {paypalClientId ? (
-              <div className="space-y-3">
-                <PayPalScriptProvider options={{
-                  clientId: paypalClientId,
-                  currency: "USD",
-                  intent: "capture",
-                }}>
-                  <PayPalButtons
-                    style={{
-                      layout: "vertical",
-                      color: "gold",
-                      shape: "rect",
-                      label: "paypal",
-                      tagline: false,
-                    }}
-                    fundingSource={undefined}
-                    createOrder={async () => {
-                      const userId = user?.id || localStorage.getItem("current_user_id");
-                      const res = await fetch("/api/paypal/create-order", {
-                        method: "POST",
-                        headers: { "Content-Type": "application/json" },
-                        body: JSON.stringify({ userId, plan: selectedPlan }),
-                      });
-                      const data = await res.json();
-                      if (data.orderId) return data.orderId;
-                      throw new Error(data.message || "Failed to create order");
-                    }}
-                    onApprove={async (data: { orderID: string }) => {
-                      setIsProcessingPayment(true);
-                      try {
-                        const res = await fetch("/api/paypal/capture-order", {
-                          method: "POST",
-                          headers: { "Content-Type": "application/json" },
-                          body: JSON.stringify({ orderId: data.orderID }),
-                        });
-                        const result = await res.json();
-                        if (result.success) {
-                          const userId = user?.id || localStorage.getItem("current_user_id");
-                          if (userId) {
-                            localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
-                            localStorage.setItem(`subscription_plan__${userId}`, result.plan);
-                            localStorage.setItem(`subscription_activated_at__${userId}`, new Date().toISOString());
-                          }
-                          setServerSubscribed(true);
-                          toast.success("Payment successful! Welcome to premium.");
-                        } else {
-                          toast.error(result.message || "Payment could not be verified.");
-                        }
-                      } catch {
-                        toast.error("Something went wrong. Please contact support.");
-                      } finally {
-                        setIsProcessingPayment(false);
-                      }
-                    }}
-                    onError={(err: Record<string, unknown>) => {
-                      console.error("PayPal error:", err);
-                      toast.error("Payment failed. Please try again.");
-                    }}
-                    onCancel={() => {
-                      toast.info("Payment cancelled.");
-                    }}
-                  />
-                </PayPalScriptProvider>
-                <div className="flex items-center justify-center gap-2">
-                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
-                  <span className="text-xs text-muted-foreground">Secured by PayPal</span>
-                </div>
-              </div>
-            ) : (
-              <Button
-                onClick={() => navigate("/paywall")}
-                className="w-full py-6 text-base font-medium rounded-xl"
-              >
-                Subscribe Now
-              </Button>
-            )}
+            <Button
+              onClick={() => navigate("/paywall")}
+              className="w-full py-6 text-base font-medium rounded-xl"
+            >
+              Subscribe Now
+            </Button>
             
             <p className="text-center text-muted-foreground text-sm">
               One-click cancellation. No hidden fees.
