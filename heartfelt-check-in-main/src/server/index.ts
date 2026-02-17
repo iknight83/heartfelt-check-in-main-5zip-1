@@ -9,7 +9,7 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 const isProduction = process.env.NODE_ENV === "production";
-const PORT = parseInt(process.env.PORT || "5000", 10);
+const PORT = isProduction ? parseInt(process.env.PORT || "5000", 10) : 3001;
 
 app.use(cors());
 

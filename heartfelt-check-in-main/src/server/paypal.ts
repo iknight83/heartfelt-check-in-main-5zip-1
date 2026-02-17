@@ -278,6 +278,202 @@ const activateSubscription = async (userId: string, plan: PlanType, paymentId: n
   console.log(`=== SUBSCRIPTION ACTIVATED SUCCESSFULLY ===`);
 };
 
+router.get("/client-id", (_req, res) => {
+  if (!PAYPAL_CLIENT_ID) {
+    return res.status(500).json({ error: "PayPal not configured" });
+  }
+  return res.json({ clientId: PAYPAL_CLIENT_ID });
+});
+
+router.post("/create-order", async (req, res) => {
+  console.log("=== PAYPAL CREATE ORDER (JS SDK) ===");
+  try {
+    if (!ordersController || !PAYPAL_CLIENT_ID || !PAYPAL_CLIENT_SECRET) {
+      return res.status(500).json({
+        error: "PayPal credentials not configured",
+        message: "Payment system is not properly configured."
+      });
+    }
+
+    const { userId, plan } = req.body;
+
+    if (!userId || !plan) {
+      return res.status(400).json({ error: "userId and plan are required" });
+    }
+
+    if (!VALID_PLANS.includes(plan as typeof VALID_PLANS[number])) {
+      return res.status(400).json({ error: "Invalid plan" });
+    }
+
+    const amount = PLAN_PRICES[plan];
+    if (!amount) {
+      return res.status(400).json({ error: "Invalid plan configuration" });
+    }
+
+    const reference = generateReference();
+
+    await pool.query(
+      `INSERT INTO payments (transaction_reference, user_id, plan, amount, status, is_anonymous)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (transaction_reference) 
+       DO UPDATE SET 
+         user_id = EXCLUDED.user_id,
+         plan = EXCLUDED.plan,
+         amount = EXCLUDED.amount,
+         is_anonymous = EXCLUDED.is_anonymous,
+         updated_at = NOW()
+       RETURNING id`,
+      [reference, userId, plan, parseFloat(amount), "pending", false]
+    );
+
+    const collect = {
+      body: {
+        intent: "CAPTURE",
+        purchaseUnits: [
+          {
+            referenceId: reference,
+            amount: {
+              currencyCode: "USD",
+              value: amount,
+            },
+            description: `STATE App - ${plan.charAt(0).toUpperCase() + plan.slice(1)} Plan`,
+            customId: JSON.stringify({ userId, plan, reference }),
+          },
+        ],
+      },
+    };
+
+    const { body } = await ordersController.createOrder(collect);
+    const orderData = JSON.parse(String(body));
+
+    console.log("PayPal order created (JS SDK):", orderData.id);
+
+    await pool.query(
+      `UPDATE payments SET transaction_reference = $1 WHERE transaction_reference = $2`,
+      [orderData.id, reference]
+    );
+
+    return res.json({ orderId: orderData.id });
+  } catch (error) {
+    console.error("PayPal create-order error:", error);
+    return res.status(500).json({
+      error: "Failed to create order",
+      message: error instanceof Error ? error.message : "Unknown error"
+    });
+  }
+});
+
+router.post("/capture-order", async (req, res) => {
+  console.log("=== PAYPAL CAPTURE ORDER (JS SDK) ===");
+  try {
+    const { orderId } = req.body;
+
+    if (!orderId) {
+      return res.status(400).json({ success: false, message: "orderId is required" });
+    }
+
+    if (!ordersController) {
+      return res.status(500).json({ success: false, message: "Payment system not configured" });
+    }
+
+    const { body } = await ordersController.captureOrder({ id: orderId });
+    const captureData = JSON.parse(String(body));
+
+    console.log("PayPal capture response:", captureData.status);
+
+    if (captureData.status === "COMPLETED") {
+      const purchaseUnit = captureData.purchaseUnits?.[0];
+      let userId: string | null = null;
+      let plan: PlanType | null = null;
+
+      if (purchaseUnit?.payments?.captures?.[0]?.customId) {
+        try {
+          const customData = JSON.parse(purchaseUnit.payments.captures[0].customId);
+          userId = customData.userId;
+          plan = customData.plan;
+        } catch {}
+      }
+
+      if (!userId && purchaseUnit?.customId) {
+        try {
+          const customData = JSON.parse(purchaseUnit.customId);
+          userId = customData.userId;
+          plan = customData.plan;
+        } catch {}
+      }
+
+      if (!userId) {
+        const paymentResult = await pool.query(
+          `SELECT user_id, plan FROM payments WHERE transaction_reference = $1`,
+          [orderId]
+        );
+        if (paymentResult.rows.length > 0) {
+          userId = paymentResult.rows[0].user_id;
+          plan = paymentResult.rows[0].plan;
+        }
+      }
+
+      await pool.query(
+        `UPDATE payments 
+         SET status = 'complete', verified_at = NOW(), updated_at = NOW()
+         WHERE transaction_reference = $1`,
+        [orderId]
+      );
+
+      const paymentResult = await pool.query(
+        `SELECT id FROM payments WHERE transaction_reference = $1`,
+        [orderId]
+      );
+
+      if (paymentResult.rows.length > 0 && userId && plan && VALID_PLANS.includes(plan)) {
+        const paymentId = paymentResult.rows[0].id;
+        await activateSubscription(userId, plan, paymentId);
+      }
+
+      return res.json({
+        success: true,
+        status: "success",
+        userId,
+        plan,
+        message: "Payment completed and subscription activated"
+      });
+    }
+
+    return res.json({
+      success: false,
+      status: captureData.status || "unknown",
+      message: "Payment not completed"
+    });
+  } catch (error: any) {
+    if (error?.statusCode === 422 && ordersController) {
+      try {
+        const { body } = await ordersController.getOrder({ id: req.body.orderId });
+        const orderData = JSON.parse(String(body));
+        if (orderData.status === "COMPLETED") {
+          const paymentResult = await pool.query(
+            `SELECT user_id, plan FROM payments WHERE transaction_reference = $1 AND status = 'complete'`,
+            [req.body.orderId]
+          );
+          if (paymentResult.rows.length > 0) {
+            return res.json({
+              success: true,
+              status: "success",
+              userId: paymentResult.rows[0].user_id,
+              plan: paymentResult.rows[0].plan,
+              message: "Payment already completed"
+            });
+          }
+        }
+      } catch {}
+    }
+    console.error("PayPal capture-order error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to capture payment"
+    });
+  }
+});
+
 router.post("/initiate", async (req, res) => {
   console.log("=== PAYPAL INITIATE ===");
   console.log("Request body:", JSON.stringify(req.body, null, 2));

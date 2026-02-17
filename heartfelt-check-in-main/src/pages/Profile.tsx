@@ -9,6 +9,7 @@ import { useMoodData } from "@/hooks/useMoodData";
 import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import BottomNav from "@/components/home/BottomNav";
+import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
 
 type PlanType = "lifetime" | "annual" | "monthly";
 
@@ -72,6 +73,7 @@ const Profile = () => {
   const [selectedPlan, setSelectedPlan] = useState<PlanType>("lifetime");
   const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [serverSubscribed, setServerSubscribed] = useState(false);
+  const [paypalClientId, setPaypalClientId] = useState<string | null>(null);
   const { isSubscribed: localSubscribed, isTrialActive, trialDaysUsed, subscribe } = useSubscription();
   const profileSummary = useProfileSummary();
   const { moodEntries } = useMoodData();
@@ -98,53 +100,17 @@ const Profile = () => {
       }
     };
 
+    const fetchClientId = async () => {
+      try {
+        const res = await fetch("/api/paypal/client-id");
+        const data = await res.json();
+        if (data.clientId) setPaypalClientId(data.clientId);
+      } catch {}
+    };
+
     checkServerSubscription();
+    fetchClientId();
   }, []);
-
-  const initiatePayPalPayment = async (plan: PlanType) => {
-    try {
-      setIsProcessingPayment(true);
-      
-      let userId = localStorage.getItem("current_user_id");
-      if (!userId) {
-        userId = `anon_${Date.now()}_${Math.random().toString(36).substring(2, 11)}`;
-        localStorage.setItem("current_user_id", userId);
-        localStorage.setItem("is_anonymous_payment", "true");
-      }
-
-      console.log("=== PAYPAL INITIATE ===");
-      console.log("User ID:", userId);
-      console.log("Plan:", plan);
-
-      const response = await fetch("/api/paypal/initiate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, plan }),
-      });
-
-      const data = await response.json();
-
-      if (data.status === "ok" && data.authorizationUrl) {
-        console.log("=== PAYPAL REDIRECT ===");
-        console.log("Authorization URL:", data.authorizationUrl);
-        
-        localStorage.setItem("pending_payment_plan", plan);
-        localStorage.setItem("pending_transaction_ref", data.reference);
-        
-        window.location.href = data.authorizationUrl;
-      } else {
-        throw new Error(data.message || "Failed to initiate payment");
-      }
-    } catch (error) {
-      console.error("Payment initiation error:", error);
-      toast.error("Failed to start payment. Please try again.");
-      setIsProcessingPayment(false);
-    }
-  };
-
-  const handleSubscribe = () => {
-    initiatePayPalPayment(selectedPlan);
-  };
 
   const handleSignOut = async () => {
     const { error } = await signOut();
@@ -206,7 +172,7 @@ const Profile = () => {
     return (
       <div className="min-h-screen gradient-bg flex flex-col items-center justify-center px-6">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-        <p className="text-foreground text-lg">Redirecting to payment...</p>
+        <p className="text-foreground text-lg">Processing payment...</p>
       </div>
     );
   }
@@ -555,13 +521,82 @@ const Profile = () => {
               ))}
             </div>
 
-            {/* Subscribe Button */}
-            <Button
-              onClick={handleSubscribe}
-              className="w-full py-6 text-base font-medium rounded-xl"
-            >
-              Subscribe Now
-            </Button>
+            {paypalClientId ? (
+              <div className="space-y-3">
+                <PayPalScriptProvider options={{
+                  clientId: paypalClientId,
+                  currency: "USD",
+                  intent: "capture",
+                }}>
+                  <PayPalButtons
+                    style={{
+                      layout: "vertical",
+                      color: "gold",
+                      shape: "rect",
+                      label: "paypal",
+                      tagline: false,
+                    }}
+                    fundingSource={undefined}
+                    createOrder={async () => {
+                      const userId = user?.id || localStorage.getItem("current_user_id");
+                      const res = await fetch("/api/paypal/create-order", {
+                        method: "POST",
+                        headers: { "Content-Type": "application/json" },
+                        body: JSON.stringify({ userId, plan: selectedPlan }),
+                      });
+                      const data = await res.json();
+                      if (data.orderId) return data.orderId;
+                      throw new Error(data.message || "Failed to create order");
+                    }}
+                    onApprove={async (data: { orderID: string }) => {
+                      setIsProcessingPayment(true);
+                      try {
+                        const res = await fetch("/api/paypal/capture-order", {
+                          method: "POST",
+                          headers: { "Content-Type": "application/json" },
+                          body: JSON.stringify({ orderId: data.orderID }),
+                        });
+                        const result = await res.json();
+                        if (result.success) {
+                          const userId = user?.id || localStorage.getItem("current_user_id");
+                          if (userId) {
+                            localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
+                            localStorage.setItem(`subscription_plan__${userId}`, result.plan);
+                            localStorage.setItem(`subscription_activated_at__${userId}`, new Date().toISOString());
+                          }
+                          setServerSubscribed(true);
+                          toast.success("Payment successful! Welcome to premium.");
+                        } else {
+                          toast.error(result.message || "Payment could not be verified.");
+                        }
+                      } catch {
+                        toast.error("Something went wrong. Please contact support.");
+                      } finally {
+                        setIsProcessingPayment(false);
+                      }
+                    }}
+                    onError={(err: Record<string, unknown>) => {
+                      console.error("PayPal error:", err);
+                      toast.error("Payment failed. Please try again.");
+                    }}
+                    onCancel={() => {
+                      toast.info("Payment cancelled.");
+                    }}
+                  />
+                </PayPalScriptProvider>
+                <div className="flex items-center justify-center gap-2">
+                  <Shield className="w-3.5 h-3.5 text-emerald-400" />
+                  <span className="text-xs text-muted-foreground">Secured by PayPal</span>
+                </div>
+              </div>
+            ) : (
+              <Button
+                onClick={() => navigate("/paywall")}
+                className="w-full py-6 text-base font-medium rounded-xl"
+              >
+                Subscribe Now
+              </Button>
+            )}
             
             <p className="text-center text-muted-foreground text-sm">
               One-click cancellation. No hidden fees.

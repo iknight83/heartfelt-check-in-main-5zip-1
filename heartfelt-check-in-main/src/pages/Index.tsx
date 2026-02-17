@@ -172,25 +172,9 @@ const Index = () => {
       return;
     }
 
-    try {
-      const response = await fetch("/api/paypal/initiate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId, plan }),
-      });
-
-      const data = await response.json();
-
-      if (data.status === "ok" && data.authorizationUrl) {
-        localStorage.setItem("pending_payment_plan", plan);
-        localStorage.setItem("pending_transaction_ref", data.reference);
-        window.location.href = data.authorizationUrl;
-      } else {
-        console.error("Payment initiation failed:", data);
-      }
-    } catch (error) {
-      console.error("Payment error:", error);
-    }
+    const onboardingKey = `termsAcceptedAt__${userId}`;
+    localStorage.setItem(onboardingKey, new Date().toISOString());
+    navigate("/paywall", { replace: true });
   };
 
   const completeOnboarding = () => {

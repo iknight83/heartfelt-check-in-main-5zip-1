@@ -72,21 +72,25 @@ The app uses PayPal for payment processing with the @paypal/paypal-server-sdk:
    - Monthly subscriptions: expires_at = activation date + 30 days
    - Backend auto-expires subscriptions when checking access (sets is_active=false if expired)
 
-4. **Payment Flow**:
-   - Client calls `/api/paypal/initiate` with userId and plan only
-   - Server creates payment record and calls PayPal API to create order
-   - Client redirects to PayPal's approval URL for user to authorize payment
-   - User approves payment on PayPal and is redirected back to callback URL
-   - Client calls `/api/paypal/verify` which captures the order and activates subscription
-   - No webhook needed — capture happens synchronously on verify
+4. **Payment Flow (Inline Smart Buttons — Feb 2026)**:
+   - User selects plan on paywall → clicks Continue → sees inline PayPal buttons
+   - PayPal JS SDK (@paypal/react-paypal-js) renders "Pay with PayPal" and "Debit or Credit Card" buttons
+   - On button click: frontend calls `/api/paypal/create-order` → server creates PayPal order → returns orderId
+   - PayPal SDK opens popup/modal for user to authorize payment
+   - On approval: frontend calls `/api/paypal/capture-order` → server captures order → activates subscription
+   - No redirect needed — everything happens inline on the page
+   - Legacy redirect flow (`/api/paypal/initiate` + `/api/paypal/verify`) still exists as fallback
 
 5. **Environment Variables Required**:
    - `PAYPAL_CLIENT_ID`: Client ID from PayPal developer dashboard
    - `PAYPAL_CLIENT_SECRET`: Secret key from PayPal developer dashboard
 
 6. **API Endpoints**:
-   - `POST /api/paypal/initiate` - Creates PayPal order and returns approval URL
-   - `POST /api/paypal/verify` - Captures payment and activates subscription
+   - `GET /api/paypal/client-id` - Returns PayPal client ID for JS SDK initialization
+   - `POST /api/paypal/create-order` - Creates PayPal order for JS SDK flow (returns orderId)
+   - `POST /api/paypal/capture-order` - Captures payment and activates subscription (JS SDK flow)
+   - `POST /api/paypal/initiate` - Creates PayPal order and returns approval URL (legacy redirect flow)
+   - `POST /api/paypal/verify` - Captures payment via reference (legacy redirect flow)
    - `GET /api/paypal/subscription/:userId` - Check user's active subscription and trial status
    - `POST /api/paypal/trial/start` - Start a 7-day free trial for a user
    - `GET /api/paypal/access/:userId` - Check if user has active subscription access
@@ -94,11 +98,15 @@ The app uses PayPal for payment processing with the @paypal/paypal-server-sdk:
 7. **Testing PayPal Payments**:
    - Use PayPal sandbox credentials (sandbox client ID + secret)
    - Test accounts available in PayPal developer dashboard
-   - Test flow: Paywall → Select plan → PayPal checkout → Success page
+   - Test flow: Paywall → Select plan → Continue → PayPal/Card buttons → Pay inline → Subscription activated
    - Verify subscription activated: Check `subscriptions` table in database
    - Test restore: Click "Restore purchases" on paywall to sync from server
 
-8. **Subscription Sync on Login**:
+8. **Dev Server Architecture**:
+   - Development: Vite on port 5000 (frontend), Express on port 3001 (API), Vite proxies /api to :3001
+   - Production: Express on port 5000 serves both API and static frontend from dist/
+
+9. **Subscription Sync on Login**:
    - Every login triggers `syncSubscriptionFromBackend()` to check backend status
    - Runs on `SIGNED_IN` and `TOKEN_REFRESHED` auth events
    - Also runs on `getSession()` for returning users with existing sessions
