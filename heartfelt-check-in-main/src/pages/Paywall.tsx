@@ -6,7 +6,7 @@ import { useAuth } from "@/hooks/useAuth";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Shield, Check } from "lucide-react";
-import { PayPalScriptProvider, PayPalButtons } from "@paypal/react-paypal-js";
+import PayPalButtonsDirect from "@/components/PayPalButtonsDirect";
 
 type PaidPlanType = "lifetime" | "annual" | "monthly";
 
@@ -172,69 +172,27 @@ const Paywall = () => {
           </div>
 
           <div className="w-full mb-4">
-            <PayPalScriptProvider options={{
-              clientId: paypalClientId,
-              currency: "USD",
-              intent: "capture",
-            }}>
-              <PayPalButtons
-                style={{
-                  layout: "vertical",
-                  color: "gold",
-                  shape: "rect",
-                  label: "paypal",
-                  tagline: false,
-                }}
-                fundingSource={undefined}
-                createOrder={async () => {
-                  const res = await fetch("/api/paypal/create-order", {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({ userId, plan: confirmingPlan }),
-                  });
-                  const data = await res.json();
-                  if (data.orderId) {
-                    return data.orderId;
-                  }
-                  throw new Error(data.message || "Failed to create order");
-                }}
-                onApprove={async (data: { orderID: string }) => {
-                  setIsProcessing(true);
-                  try {
-                    const res = await fetch("/api/paypal/capture-order", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ orderId: data.orderID }),
-                    });
-                    const result = await res.json();
-
-                    if (result.success) {
-                      if (userId) {
-                        localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
-                        localStorage.setItem(`subscription_plan__${userId}`, result.plan);
-                        localStorage.setItem(`subscription_activated_at__${userId}`, new Date().toISOString());
-                      }
-                      toast.success("Payment successful! Welcome to premium.");
-                      navigate("/home");
-                    } else {
-                      toast.error(result.message || "Payment could not be verified.");
-                      setIsProcessing(false);
-                    }
-                  } catch (err) {
-                    console.error("Capture error:", err);
-                    toast.error("Something went wrong. Please contact support.");
-                    setIsProcessing(false);
-                  }
-                }}
-                onError={(err: Record<string, unknown>) => {
-                  console.error("PayPal error:", err);
-                  toast.error("Payment failed. Please try again.");
-                }}
-                onCancel={() => {
-                  toast.info("Payment cancelled.");
-                }}
-              />
-            </PayPalScriptProvider>
+            <PayPalButtonsDirect
+              clientId={paypalClientId}
+              plan={confirmingPlan}
+              userId={userId || ""}
+              onSuccess={(result) => {
+                if (userId) {
+                  localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
+                  localStorage.setItem(`subscription_plan__${userId}`, result.plan);
+                  localStorage.setItem(`subscription_activated_at__${userId}`, new Date().toISOString());
+                }
+                toast.success("Payment successful! Welcome to premium.");
+                navigate("/home");
+              }}
+              onError={(err) => {
+                console.error("PayPal error:", err);
+                toast.error("Payment failed. Please try again.");
+              }}
+              onCancel={() => {
+                toast.info("Payment cancelled.");
+              }}
+            />
           </div>
 
           <div className="flex items-center gap-2 mb-4">
