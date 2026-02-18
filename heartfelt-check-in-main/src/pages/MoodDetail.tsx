@@ -152,15 +152,16 @@ const MoodDetail = () => {
         {/* Mood Display - left aligned with dynamic color, clickable */}
         <button 
           onClick={() => navigate(`/mood-adjust?mood=${encodeURIComponent(mood)}&time=${encodeURIComponent(time)}&triggers=${encodeURIComponent(triggers.join(","))}&new=${isNewEntry}&date=${dateParam || format(selectedDate, "yyyy-MM-dd")}${entryId ? `&id=${entryId}` : ""}`)}
-          className="text-left space-y-2 py-4 w-full hover:opacity-80 transition-opacity"
+          className="text-left space-y-2 py-5 px-5 w-full rounded-2xl bg-card/20 border border-border/20 cursor-pointer transition-all duration-300 hover:bg-card/40 hover:border-accent/30 hover:scale-[1.02] active:scale-[0.99] group animate-mood-pulse"
         >
           <p className="text-muted-foreground text-lg">I'm feeling</p>
           <h1 
-            className="text-5xl font-bold transition-colors duration-300"
+            className="text-5xl font-bold transition-all duration-300 group-hover:brightness-125 group-hover:scale-[1.03]"
             style={{ color: moodColor }}
           >
             {mood}
           </h1>
+          <p className="text-accent/60 text-xs mt-1">Tap to change mood</p>
         </button>
 
         {/* Thoughts Section */}
@@ -177,15 +178,16 @@ const MoodDetail = () => {
 
         {/* Context Tags */}
         <div className="space-y-4">
-          <div className="flex items-center gap-3">
-            <p className="text-xl font-bold text-foreground">Triggers</p>
-            <button 
-              onClick={() => navigate(`/triggers?mood=${encodeURIComponent(mood)}&time=${encodeURIComponent(time)}&triggers=${encodeURIComponent(triggers.join(","))}&new=${isNewEntry}&date=${dateParam || format(selectedDate, "yyyy-MM-dd")}${entryId ? `&id=${entryId}` : ""}`)}
-              className="p-1 text-accent hover:text-accent/80 transition-colors"
-            >
-              <Plus className="w-5 h-5" />
-            </button>
-          </div>
+          <button 
+            onClick={() => navigate(`/triggers?mood=${encodeURIComponent(mood)}&time=${encodeURIComponent(time)}&triggers=${encodeURIComponent(triggers.join(","))}&new=${isNewEntry}&date=${dateParam || format(selectedDate, "yyyy-MM-dd")}${entryId ? `&id=${entryId}` : ""}`)}
+            className="flex items-center gap-3 cursor-pointer group transition-all duration-200 hover:opacity-90"
+          >
+            <p className="text-xl font-bold text-foreground group-hover:underline group-hover:underline-offset-4 group-hover:decoration-accent/40">Triggers</p>
+            <div className="p-1.5 rounded-full text-accent group-hover:bg-accent/15 group-hover:shadow-[0_0_8px_rgba(100,180,255,0.3)] transition-all duration-200">
+              <Plus className="w-6 h-6" />
+            </div>
+          </button>
+          <p className="text-muted-foreground/60 text-xs -mt-2">Add what influenced your mood</p>
           <div className="flex flex-wrap gap-2">
             {triggers.map((trigger) => (
               <span

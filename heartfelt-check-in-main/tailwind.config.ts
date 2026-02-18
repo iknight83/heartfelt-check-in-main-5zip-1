@@ -86,6 +86,11 @@ export default {
           "0%, 100%": { opacity: "1" },
           "50%": { opacity: "0.8" },
         },
+        "mood-pulse": {
+          "0%": { transform: "scale(1)", boxShadow: "0 0 0 0 rgba(100, 180, 255, 0)" },
+          "40%": { transform: "scale(1.015)", boxShadow: "0 0 12px 2px rgba(100, 180, 255, 0.15)" },
+          "100%": { transform: "scale(1)", boxShadow: "0 0 0 0 rgba(100, 180, 255, 0)" },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
@@ -93,6 +98,7 @@ export default {
         "fade-in": "fade-in 0.5s ease-out forwards",
         "scale-in": "scale-in 0.3s ease-out forwards",
         "pulse-soft": "pulse-soft 2s ease-in-out infinite",
+        "mood-pulse": "mood-pulse 0.8s ease-in-out 1",
       },
     },
   },
