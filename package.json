@@ -13,5 +13,9 @@
     "@paypal/paypal-server-sdk": "^2.2.0",
     "@paypal/react-paypal-js": "^8.9.2",
     "@revenuecat/purchases-capacitor": "^12.2.1"
+  },
+  "overrides": {
+    "minimatch": "10.2.3",
+    "tar": "^7.5.8"
   }
 }
