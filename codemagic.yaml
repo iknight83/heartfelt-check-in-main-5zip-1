@@ -1,0 +1,39 @@
+workflows:
+  ios-workflow:
+    name: iOS Build
+    instance_type: mac_mini_m2
+    environment:
+      ios_signing:
+        distribution_type: app_store
+        bundle_identifier: com.knightleeron.state
+      vars:
+        XCODE_WORKSPACE: "heartfelt-check-in-main/ios/App/App.xcworkspace"
+        XCODE_SCHEME: "App"
+    scripts:
+      - name: Install dependencies
+        script: |
+          cd heartfelt-check-in-main
+          npm install
+      - name: Build web app
+        script: |
+          cd heartfelt-check-in-main
+          npm run build
+      - name: Capacitor sync
+        script: |
+          cd heartfelt-check-in-main
+          npx cap sync ios
+      - name: Install pods
+        script: |
+          cd heartfelt-check-in-main/ios/App
+          pod install
+      - name: Build iOS
+        script: |
+          xcode-project build-ipa \
+            --workspace "$XCODE_WORKSPACE" \
+            --scheme "$XCODE_SCHEME"
+    artifacts:
+      - build/ios/ipa/*.ipa
+    publishing:
+      app_store_connect:
+        auth: integration
+        submit_to_testflight: true
