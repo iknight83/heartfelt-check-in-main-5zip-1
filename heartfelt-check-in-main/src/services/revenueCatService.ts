@@ -6,7 +6,7 @@ import {
   type PurchasesPackage,
 } from "@revenuecat/purchases-capacitor";
 
-const RC_APPLE_KEY = "appl_REPLACE_WITH_YOUR_KEY_FROM_REVENUECAT_DASHBOARD";
+const RC_APPLE_KEY = "test_ihGcNfXmeUGuwOAGjINewDmrveG";
 
 export const ENTITLEMENT_PRO = "pro";
 
@@ -50,7 +50,7 @@ export type PurchaseResult =
   | { success: false; cancelled: boolean; error: string };
 
 export async function purchasePackage(
-  pkg: PurchasesPackage
+  pkg: PurchasesPackage,
 ): Promise<PurchaseResult> {
   try {
     const { customerInfo } = await Purchases.purchasePackage({ aPackage: pkg });
