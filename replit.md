@@ -48,7 +48,7 @@ All payments require authenticated users - no anonymous payments:
 ### Subscription System
 - **Trial Period**: 7-day free trial from first visit
 - **Plans**: Monthly ($2.99), Annual ($21.99), Lifetime ($59.99) subscription tiers — all in USD
-- **Payment Provider**: PayPal (global payment gateway, USD currency)
+- **Payment Provider**: PayPal for Android/web (USD), RevenueCat + Apple IAP for iOS
 - **Feature Gating**: Confidence levels for insights are restricted based on subscription status
 - **Currency Migration**: Migrated from Paystack (ZAR) to PayPal (USD) in Feb 2026 at ~R16=$1
 
@@ -112,6 +112,20 @@ The app uses PayPal for payment processing with the @paypal/paypal-server-sdk:
    - Also runs on `getSession()` for returning users with existing sessions
    - Prevents reliance on potentially stale localStorage cache
    - Ensures expired subscriptions are immediately reflected on the frontend
+
+### RevenueCat iOS IAP Integration (Mar 2026)
+Apple requires native In-App Purchases for iOS digital subscriptions. RevenueCat handles this:
+
+1. **Platform Detection**: `Capacitor.getPlatform() === "ios"` determines payment flow
+2. **iOS Flow**: RevenueCat SDK → Apple StoreKit → native purchase popup → entitlement check
+3. **Android/Web Flow**: PayPal (unchanged) — all PayPal code preserved in `else` branches
+4. **Service File**: `src/services/revenueCatService.ts` — init, packages, purchase, restore
+5. **Entitlement**: "pro" entitlement checked via `customerInfo.entitlements.active`
+6. **Product IDs**: `com.knightleerons.state.pro.{monthly,annual,lifetime}`
+7. **API Key**: Set `RC_APPLE_KEY` in revenueCatService.ts with your RevenueCat dashboard key
+8. **Init**: `initRevenueCat()` called in App.tsx useEffect (no-op on non-iOS)
+9. **Restore**: iOS uses RevenueCat restore; Android uses PayPal backend restore
+10. **Dependencies**: `@capacitor/core`, `@revenuecat/purchases-capacitor`
 
 ### Data Persistence Implementation (Fixed Dec 2025)
 The app now uses a robust data migration pattern:

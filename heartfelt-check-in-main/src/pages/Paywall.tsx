@@ -7,6 +7,16 @@ import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { ArrowLeft, Shield, Check } from "lucide-react";
 import PayPalButtonsDirect from "@/components/PayPalButtonsDirect";
+import { Capacitor } from "@capacitor/core";
+import {
+  getAvailablePackages,
+  purchasePackage,
+  restoreApplePurchases,
+  ENTITLEMENT_PRO,
+} from "@/services/revenueCatService";
+import { type PurchasesPackage } from "@revenuecat/purchases-capacitor";
+
+const isIOS = Capacitor.getPlatform() === "ios";
 
 type PaidPlanType = "lifetime" | "annual" | "monthly";
 
@@ -30,6 +40,7 @@ const Paywall = () => {
   const [confirmingPlan, setConfirmingPlan] = useState<PaidPlanType | null>(null);
   const [paypalClientId, setPaypalClientId] = useState<string | null>(null);
   const [loadingClientId, setLoadingClientId] = useState(false);
+  const [applePackages, setApplePackages] = useState<PurchasesPackage[]>([]);
 
   useEffect(() => {
     const fetchClientId = async () => {
@@ -47,6 +58,11 @@ const Paywall = () => {
       }
     };
     fetchClientId();
+  }, []);
+
+  useEffect(() => {
+    if (!isIOS) return;
+    getAvailablePackages().then(setApplePackages);
   }, []);
 
   const handleContinue = async (plan: "lifetime" | "annual" | "monthly" | "trial") => {
@@ -83,7 +99,11 @@ const Paywall = () => {
         setIsProcessing(false);
       }
     } else {
-      setConfirmingPlan(plan);
+      if (isIOS) {
+        await handleApplePurchase(plan);
+      } else {
+        setConfirmingPlan(plan);
+      }
     }
   };
 
@@ -91,19 +111,96 @@ const Paywall = () => {
     setConfirmingPlan(null);
   };
 
+  const handleApplePurchase = async (plan: PaidPlanType) => {
+    setIsProcessing(true);
+    try {
+      const productIds: Record<PaidPlanType, string> = {
+        monthly: "com.knightleerons.state.pro.monthly",
+        annual: "com.knightleerons.state.pro.annual",
+        lifetime: "com.knightleerons.state.pro.lifetime",
+      };
+
+      const pkg =
+        applePackages.find(
+          (p) => p.product.identifier === productIds[plan]
+        ) ?? applePackages[0];
+
+      if (!pkg) {
+        toast.error("Subscription not available. Please try again later.");
+        return;
+      }
+
+      const result = await purchasePackage(pkg);
+
+      if (result.success) {
+        const isPro =
+          result.customerInfo.entitlements.active[ENTITLEMENT_PRO] !== undefined;
+        if (isPro) {
+          const userId = user?.id;
+          if (userId) {
+            localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
+            localStorage.setItem(`subscription_plan__${userId}`, plan);
+            localStorage.setItem(
+              `subscription_activated_at__${userId}`,
+              new Date().toISOString()
+            );
+            localStorage.setItem(
+              `subscription_is_lifetime__${userId}`,
+              plan === "lifetime" ? "true" : "false"
+            );
+          }
+          subscribe(plan);
+          toast.success("Welcome to premium! 🎉");
+          navigate("/home");
+        } else {
+          toast.error(
+            "Purchase completed but access not granted. Please tap Restore Purchases."
+          );
+        }
+      } else if (!result.cancelled) {
+        toast.error("Purchase failed. Please try again.");
+      }
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handleRestore = async () => {
     const userId = user?.id;
+
+    if (isIOS) {
+      setIsProcessing(true);
+      try {
+        const result = await restoreApplePurchases();
+        if (result.success && result.isPro) {
+          if (userId) {
+            localStorage.setItem(
+              `deeper_insights_subscribed__${userId}`,
+              "true"
+            );
+          }
+          subscribe();
+          toast.success("Your subscription has been restored!");
+          navigate("/home");
+        } else if (result.success) {
+          toast.info("No active subscription found to restore.");
+        } else {
+          toast.error("Restore failed. Please try again.");
+        }
+      } finally {
+        setIsProcessing(false);
+      }
+      return;
+    }
+
     if (!userId) {
       toast.error("Please sign in to restore purchases");
       return;
     }
-
     try {
       setIsProcessing(true);
-      
       const response = await fetch(`/api/paypal/subscription/${userId}`);
       const data = await response.json();
-
       if (data.hasSubscription) {
         localStorage.setItem(`deeper_insights_subscribed__${userId}`, "true");
         localStorage.setItem(`subscription_plan__${userId}`, data.plan);
