@@ -23,8 +23,7 @@ workflows:
         script: |
           cd heartfelt-check-in-main
           npm install @capacitor/cli @capacitor/core @capacitor/ios
-          sed -i '' 's/platform :ios, .*/platform :ios, '"'"'14.0'"'"'/' ios/App/Podfile || sed -i 's/platform :ios, .*/platform :ios, '"'"'14.0'"'"'/' ios/App/Podfile
-          cat ios/App/Podfile | head -5
+          sed -i '' 's/platform :ios, .*/platform :ios, '"'"'16.0'"'"'/' ios/App/Podfile || sed -i 's/platform :ios, .*/platform :ios, '"'"'16.0'"'"'/' ios/App/Podfile
           npx cap sync ios
       - name: Set up code signing
         script: xcode-project use-profiles
