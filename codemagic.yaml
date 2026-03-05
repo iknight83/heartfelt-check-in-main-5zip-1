@@ -29,10 +29,17 @@ workflows:
         script: xcode-project use-profiles
       - name: Build iOS
         script: |
-          xcode-build-and-archive \
+          xcodebuild \
             -workspace heartfelt-check-in-main/ios/App/App.xcworkspace \
             -scheme App \
-            -config Release
+            -configuration Release \
+            -archivePath build/App.xcarchive \
+            archive
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist heartfelt-check-in-main/ios/App/ExportOptions.plist
     artifacts:
       - build/ios/ipa/*.ipa
     publishing:
