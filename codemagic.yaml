@@ -9,7 +9,7 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.knightleeron.state
-      node: 18
+      node: 20
     scripts:
       - name: Install dependencies
         script: npm install
