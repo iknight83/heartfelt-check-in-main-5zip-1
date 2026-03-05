@@ -15,8 +15,12 @@ workflows:
         script: npm install
       - name: Build web app
         script: npm run build
-      - name: Sync Capacitor
-        script: npx cap sync ios
+      - name: Add and Sync iOS
+        script: |
+          if [ ! -d "ios" ]; then
+            npx cap add ios
+          fi
+          npx cap sync ios
       - name: Set up code signing
         script: xcode-project use-profiles
       - name: Build iOS
