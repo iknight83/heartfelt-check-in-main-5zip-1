@@ -26,13 +26,17 @@ workflows:
           cd heartfelt-check-in-main
           npm install @capacitor/cli @capacitor/core @capacitor/ios
           npx cap copy ios
-          # Podfile uses ../../../node_modules which resolves to repo root.
-          # Symlink repo root node_modules -> heartfelt-check-in-main/node_modules
+
+          # Fix Podfile deployment target BEFORE pod install
+          sed -i '' "s/platform :ios, .*/platform :ios, '16.0'/" ios/App/Podfile
+
+          # Symlink node_modules to repo root so Podfile path resolves correctly
           ln -sf "$(pwd)/node_modules" ../node_modules
+
           cd ios/App
           pod install --repo-update
 
-      - name: Fix deployment target
+      - name: Fix deployment target in Xcode project
         script: |
           sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 14.0/IPHONEOS_DEPLOYMENT_TARGET = 16.0/g' \
             heartfelt-check-in-main/ios/App/App.xcodeproj/project.pbxproj
