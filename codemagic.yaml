@@ -25,7 +25,9 @@ workflows:
         script: |
           cd heartfelt-check-in-main
           npm install @capacitor/cli @capacitor/core @capacitor/ios
-          npx cap sync ios
+          npx cap copy ios
+          cd ios/App
+          pod install --repo-update
 
       - name: Fix deployment target
         script: |
