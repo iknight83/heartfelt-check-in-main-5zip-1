@@ -44,6 +44,12 @@ workflows:
       - name: Set up code signing
         script: xcode-project use-profiles
 
+      - name: Set build number
+        script: |
+          # Use Codemagic build number to ensure unique build each time
+          agvtool new-version -all $BUILD_NUMBER
+        working_directory: heartfelt-check-in-main/ios/App
+
       - name: Build iOS
         script: |
           xcodebuild \
