@@ -26,6 +26,9 @@ workflows:
           cd heartfelt-check-in-main
           npm install @capacitor/cli @capacitor/core @capacitor/ios
           npx cap copy ios
+          # Podfile uses ../../../node_modules which resolves to repo root.
+          # Symlink repo root node_modules -> heartfelt-check-in-main/node_modules
+          ln -sf "$(pwd)/node_modules" ../node_modules
           cd ios/App
           pod install --repo-update
 
