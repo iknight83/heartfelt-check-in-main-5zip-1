@@ -12,21 +12,23 @@ workflows:
       node: 20
     scripts:
       - name: Install dependencies
-        script: npm install
-      - name: Build web app
-        script: npm run build
-      - name: Add and Sync iOS
         script: |
-          if [ ! -d "ios" ]; then
-            npx cap add ios
-          fi
+          cd heartfelt-check-in-main
+          npm install
+      - name: Build web app
+        script: |
+          cd heartfelt-check-in-main
+          npm run build
+      - name: Sync iOS
+        script: |
+          cd heartfelt-check-in-main
           npx cap sync ios
       - name: Set up code signing
         script: xcode-project use-profiles
       - name: Build iOS
         script: |
           xcode-build-and-archive \
-            -workspace ios/App/App.xcworkspace \
+            -workspace heartfelt-check-in-main/ios/App/App.xcworkspace \
             -scheme App \
             -config Release
     artifacts:
