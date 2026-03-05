@@ -22,6 +22,7 @@ workflows:
       - name: Sync iOS
         script: |
           cd heartfelt-check-in-main
+          npm install @capacitor/cli @capacitor/core @capacitor/ios
           npx cap sync ios
       - name: Set up code signing
         script: xcode-project use-profiles
