@@ -78,9 +78,9 @@ const PaywallScreen = ({ onContinue, onRestore }: PaywallScreenProps) => {
   };
 
   return (
-    <div className="min-h-screen gradient-bg flex flex-col px-6 py-8">
+    <div className="min-h-screen gradient-bg flex flex-col px-6 py-6" style={{ minHeight: "100dvh" }}>
       {/* Restore Purchases - Top Right */}
-      <div className="flex justify-end opacity-0 animate-fade-in" style={{ animationFillMode: "forwards" }}>
+      <div className="w-full max-w-[500px] mx-auto flex justify-end opacity-0 animate-fade-in" style={{ animationFillMode: "forwards" }}>
         <button
           onClick={onRestore}
           className="text-soft hover:text-foreground transition-colors text-sm"
@@ -90,9 +90,9 @@ const PaywallScreen = ({ onContinue, onRestore }: PaywallScreenProps) => {
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col justify-center max-w-md mx-auto w-full">
+      <div className="flex-1 flex flex-col justify-center max-w-[500px] mx-auto w-full">
         {/* Header */}
-        <div className="text-center mb-8">
+        <div className="text-center mb-6">
           <h1 
             className="text-2xl font-semibold text-foreground mb-3 opacity-0 animate-fade-in"
             style={{ animationDelay: "0.1s", animationFillMode: "forwards" }}
@@ -109,7 +109,7 @@ const PaywallScreen = ({ onContinue, onRestore }: PaywallScreenProps) => {
 
         {/* Features */}
         <div 
-          className="mb-8 space-y-3 opacity-0 animate-fade-in"
+          className="mb-6 space-y-2 opacity-0 animate-fade-in"
           style={{ animationDelay: "0.25s", animationFillMode: "forwards" }}
         >
           {features.map((feature, index) => (
@@ -124,7 +124,7 @@ const PaywallScreen = ({ onContinue, onRestore }: PaywallScreenProps) => {
 
         {/* Pricing Cards */}
         <div 
-          className="space-y-3 mb-8 opacity-0 animate-fade-in"
+          className="space-y-2 mb-6 opacity-0 animate-fade-in"
           style={{ animationDelay: "0.3s", animationFillMode: "forwards" }}
         >
           {plans.map((plan) => (
@@ -183,7 +183,7 @@ const PaywallScreen = ({ onContinue, onRestore }: PaywallScreenProps) => {
 
         {/* CTA Button */}
         <div 
-          className="space-y-4 opacity-0 animate-fade-in"
+          className="space-y-3 opacity-0 animate-fade-in"
           style={{ animationDelay: "0.4s", animationFillMode: "forwards" }}
         >
           <Button

@@ -157,8 +157,23 @@ const Paywall = () => {
             "Purchase completed but access not granted. Please tap Restore Purchases."
           );
         }
-      } else if (!result.cancelled) {
-        toast.error("Purchase failed. Please try again.");
+      } else if (result.cancelled) {
+        // User cancelled — silently dismiss
+      } else {
+        alert(
+          "Purchase Failed\n\nSomething went wrong processing your purchase. Please try again.\n\n" +
+            result.error
+        );
+      }
+    } catch (error: any) {
+      if (error?.userCancelled) {
+        // User cancelled — silently dismiss
+      } else {
+        const message = error?.message || String(error);
+        alert(
+          "Purchase Failed\n\nSomething went wrong processing your purchase. Please try again.\n\n" +
+            message
+        );
       }
     } finally {
       setIsProcessing(false);
