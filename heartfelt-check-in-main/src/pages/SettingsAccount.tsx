@@ -1,4 +1,4 @@
-import { ArrowLeft, Cloud, Download, RefreshCw, Trash2 } from "lucide-react";
+import { ArrowLeft, Cloud, Download, RefreshCw, Trash2, UserX } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,57 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
 
 const SettingsAccount = () => {
   const navigate = useNavigate();
+  const { user, signOut } = useAuth();
   const [isExporting, setIsExporting] = useState(false);
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  const isEmailUser = !!user?.email;
+
+  const handleDeleteAccount = async () => {
+    setIsDeletingAccount(true);
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      if (!currentUser) {
+        alert("Unable to delete account. Please contact support at support@knightleeron.com.");
+        return;
+      }
+
+      const userId = currentUser.id;
+
+      await supabase.from("profiles").delete().eq("id", userId);
+
+      const keysToRemove = Object.keys(localStorage).filter(
+        (key) =>
+          key.includes(userId) ||
+          key.startsWith("moodHistory") ||
+          key.startsWith("trackedFactors") ||
+          key.startsWith("factorCounts") ||
+          key.startsWith("notificationSettings") ||
+          key.startsWith("insightSettings") ||
+          key.startsWith("subscriptionStatus") ||
+          key.startsWith("trialStartDate") ||
+          key.startsWith("deeper_insights_subscribed") ||
+          key.startsWith("subscription_plan") ||
+          key.startsWith("subscription_activated_at") ||
+          key.startsWith("subscription_expires_at") ||
+          key.startsWith("subscription_is_lifetime")
+      );
+      keysToRemove.forEach((key) => localStorage.removeItem(key));
+
+      await supabase.auth.signOut();
+      navigate("/");
+    } catch (error) {
+      console.error("Delete account error:", error);
+      alert("Unable to delete account. Please contact support at support@knightleeron.com.");
+    } finally {
+      setIsDeletingAccount(false);
+    }
+  };
 
   const handleExportData = async () => {
     setIsExporting(true);
@@ -202,6 +249,56 @@ const SettingsAccount = () => {
             </AlertDialog>
           </div>
         </div>
+
+        {isEmailUser && (
+          <div className="space-y-3 pt-4 border-t border-border/50">
+            <h2 className="text-sm font-medium text-muted-foreground uppercase tracking-wide">
+              Account
+            </h2>
+
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <button
+                  disabled={isDeletingAccount}
+                  className="w-full flex items-center gap-4 bg-card rounded-xl p-4 border border-destructive/30 hover:bg-destructive/5 transition-colors text-left"
+                >
+                  <div className="w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                    {isDeletingAccount ? (
+                      <div className="w-5 h-5 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <UserX className="w-5 h-5 text-destructive" />
+                    )}
+                  </div>
+                  <div>
+                    <p className="font-medium text-destructive">
+                      {isDeletingAccount ? "Deleting account..." : "Delete Account"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      Permanently delete your account and all data
+                    </p>
+                  </div>
+                </button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Delete Account?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    This will permanently delete your account and all your mood tracking data. This action cannot be undone.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    onClick={handleDeleteAccount}
+                    className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                  >
+                    Delete Account
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+          </div>
+        )}
       </div>
     </div>
   );
