@@ -109,17 +109,68 @@ const SettingsAccount = () => {
     });
   };
 
-  const handleDeleteAllData = () => {
-    localStorage.removeItem("moodHistory");
-    localStorage.removeItem("trackedFactors");
-    localStorage.removeItem("factorCounts");
-    localStorage.removeItem("notificationSettings");
-    localStorage.removeItem("insightSettings");
-    localStorage.removeItem("subscriptionStatus");
-    localStorage.removeItem("trialStartDate");
-    
-    toast({ title: "All data deleted" });
-    navigate("/");
+  const handleDeleteAllData = async () => {
+    try {
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+
+      if (currentUser) {
+        const userId = currentUser.id;
+
+        console.log("[Delete All Data] Deleting from Supabase tables for user:", userId);
+        console.log("[Delete All Data] Tables: mood_entries, factor_entries");
+
+        const { error: factorError } = await supabase
+          .from("factor_entries")
+          .delete()
+          .eq("user_id", userId);
+        if (factorError) console.error("[Delete All Data] factor_entries error:", factorError);
+
+        const { error: moodError } = await supabase
+          .from("mood_entries")
+          .delete()
+          .eq("user_id", userId);
+        if (moodError) console.error("[Delete All Data] mood_entries error:", moodError);
+
+        const keysToRemove = Object.keys(localStorage).filter(
+          (key) =>
+            key.includes(userId) ||
+            key.startsWith("mood_history") ||
+            key.startsWith("moodHistory") ||
+            key.startsWith("trackedFactors") ||
+            key.startsWith("tracked_factors") ||
+            key.startsWith("factorCounts") ||
+            key.startsWith("daily_factor_counts") ||
+            key.startsWith("pending_tracked_factors") ||
+            key.startsWith("notificationSettings") ||
+            key.startsWith("insightSettings") ||
+            key.startsWith("subscriptionStatus") ||
+            key.startsWith("trialStartDate")
+        );
+        keysToRemove.forEach((key) => localStorage.removeItem(key));
+      } else {
+        localStorage.removeItem("moodHistory");
+        localStorage.removeItem("trackedFactors");
+        localStorage.removeItem("factorCounts");
+        localStorage.removeItem("mood_history");
+        localStorage.removeItem("tracked_factors");
+        localStorage.removeItem("daily_factor_counts");
+        localStorage.removeItem("pending_tracked_factors");
+        localStorage.removeItem("notificationSettings");
+        localStorage.removeItem("insightSettings");
+        localStorage.removeItem("subscriptionStatus");
+        localStorage.removeItem("trialStartDate");
+      }
+
+      toast({ title: "All data has been deleted" });
+      navigate("/home");
+    } catch (error) {
+      console.error("[Delete All Data] Error:", error);
+      toast({
+        title: "Failed to delete data",
+        description: "Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   return (
