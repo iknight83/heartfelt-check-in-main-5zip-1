@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Check, Clock } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
+import { Capacitor } from "@capacitor/core";
 
 interface PaywallScreenProps {
   onContinue: (plan: "lifetime" | "annual" | "monthly" | "trial") => void;
@@ -195,6 +196,15 @@ const PaywallScreen = ({ onContinue, onRestore }: PaywallScreenProps) => {
           <p className="text-center text-soft text-sm">
             One-click cancellation. No hidden fees.
           </p>
+          
+          {Capacitor.getPlatform() === "ios" && (
+            <button
+              onClick={onRestore}
+              className="text-muted-foreground hover:text-foreground transition-colors text-xs text-center w-full mt-2"
+            >
+              Restore Purchases
+            </button>
+          )}
         </div>
       </div>
     </div>

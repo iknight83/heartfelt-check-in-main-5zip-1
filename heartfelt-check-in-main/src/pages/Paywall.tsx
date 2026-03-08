@@ -180,12 +180,12 @@ const Paywall = () => {
             );
           }
           subscribe();
-          toast.success("Your subscription has been restored!");
+          alert("Purchases restored successfully!");
           navigate("/home");
         } else if (result.success) {
-          toast.info("No active subscription found to restore.");
+          alert("No active purchases found linked to your account.");
         } else {
-          toast.error("Restore failed. Please try again.");
+          alert("Unable to restore purchases. Please try again or contact support.");
         }
       } finally {
         setIsProcessing(false);
