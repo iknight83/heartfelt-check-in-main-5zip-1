@@ -2,72 +2,86 @@ import { Card, CardContent } from "@/components/ui/card";
 
 interface EmotionalConsistencyProps {
   stability: { score: number; description: string };
+  entryCount: number;
 }
 
-export const EmotionalConsistency = ({ stability }: EmotionalConsistencyProps) => {
+const MIN_ENTRIES = 7;
+
+const getScoreLabel = (score: number) => {
+  if (score >= 80) return { label: "Very stable", color: "#22c55e" };
+  if (score >= 60) return { label: "Fairly steady", color: "#3b82f6" };
+  if (score >= 40) return { label: "Some variation", color: "#f59e0b" };
+  return { label: "High variability", color: "#ef4444" };
+};
+
+export const EmotionalConsistency = ({ stability, entryCount }: EmotionalConsistencyProps) => {
+  const isLocked = entryCount < MIN_ENTRIES;
+
+  if (isLocked) {
+    return (
+      <Card className="bg-card/60 backdrop-blur-sm border-border/40">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-foreground font-bold">Emotional Consistency</h2>
+            <span className="text-xs text-muted-foreground px-2 py-1 rounded-full bg-muted/20 border border-border/30">
+              {entryCount}/{MIN_ENTRIES} days
+            </span>
+          </div>
+
+          <div className="rounded-xl bg-muted/10 border border-border/20 p-5 flex flex-col items-center gap-3 text-center">
+            <span className="text-2xl">📊</span>
+            <p className="text-foreground text-sm font-medium">Score unlocks at {MIN_ENTRIES} days</p>
+            <p className="text-muted-foreground text-xs leading-relaxed">
+              You need {MIN_ENTRIES - entryCount} more check-in{MIN_ENTRIES - entryCount !== 1 ? "s" : ""} for a
+              meaningful consistency reading
+            </p>
+            <div className="w-full h-1.5 rounded-full bg-border/30 overflow-hidden mt-1">
+              <div
+                className="h-full rounded-full bg-accent transition-all duration-500"
+                style={{ width: `${Math.min(100, (entryCount / MIN_ENTRIES) * 100)}%` }}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
   const score = Math.round(stability.score);
-  
-  // Generate waveform bars for visual effect
-  const waveformBars = Array.from({ length: 24 }, (_, i) => {
-    const variance = Math.sin(i * 0.5) * 20 + Math.random() * 15;
-    const height = Math.max(20, Math.min(100, score + variance - 30));
-    const isHighlighted = i < (score / 100) * 24;
-    return { height, isHighlighted };
-  });
+  const { label: scoreLabel, color: scoreColor } = getScoreLabel(score);
 
   return (
     <Card className="bg-card/60 backdrop-blur-sm border-border/40 overflow-hidden">
       <CardContent className="p-5">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-foreground font-bold">Emotional Consistency</h2>
-          <div className="flex items-center gap-1.5">
-            <div 
-              className="w-8 h-8 rounded-lg flex items-center justify-center font-bold text-sm"
-              style={{
-                background: score > 60 
-                  ? 'linear-gradient(135deg, hsl(var(--accent) / 0.2), hsl(var(--accent) / 0.1))'
-                  : 'linear-gradient(135deg, hsl(45 90% 50% / 0.2), hsl(45 90% 50% / 0.1))',
-                color: score > 60 ? 'hsl(var(--accent))' : 'hsl(45 90% 50%)'
-              }}
-            >
-              {score}
-            </div>
+          <div
+            className="w-9 h-9 rounded-lg flex items-center justify-center font-bold text-sm"
+            style={{
+              backgroundColor: `${scoreColor}20`,
+              color: scoreColor,
+            }}
+          >
+            {score}
           </div>
         </div>
 
-        {/* Waveform visualization */}
-        <div className="flex items-end justify-between gap-0.5 h-12 mb-4">
-          {waveformBars.map((bar, idx) => (
-            <div
-              key={idx}
-              className="flex-1 rounded-sm transition-all duration-500"
-              style={{
-                height: `${bar.height}%`,
-                backgroundColor: bar.isHighlighted 
-                  ? 'hsl(var(--accent))' 
-                  : 'hsl(var(--border) / 0.4)',
-                opacity: bar.isHighlighted ? 0.7 + (idx / 48) : 0.3
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Progress bar */}
         <div className="relative h-2 rounded-full bg-border/30 overflow-hidden mb-3">
-          <div 
+          <div
             className="h-full rounded-full transition-all duration-700 ease-out"
-            style={{ 
+            style={{
               width: `${score}%`,
-              background: 'linear-gradient(90deg, hsl(var(--accent) / 0.6), hsl(var(--accent)))'
+              backgroundColor: scoreColor,
+              boxShadow: `0 0 8px ${scoreColor}50`,
             }}
           />
         </div>
 
-        <p className="text-muted-foreground text-sm leading-relaxed mb-2">
-          {stability.description}
+        <p className="font-medium mb-1" style={{ color: scoreColor }}>
+          {scoreLabel}
         </p>
-        <p className="text-muted-foreground/60 text-xs">
-          Higher consistency means fewer sudden mood shifts throughout the month.
+        <p className="text-muted-foreground text-sm leading-relaxed">
+          {stability.description}
         </p>
       </CardContent>
     </Card>

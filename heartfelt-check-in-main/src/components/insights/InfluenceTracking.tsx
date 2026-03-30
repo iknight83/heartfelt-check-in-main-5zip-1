@@ -43,7 +43,8 @@ export const InfluenceTracking = ({
         }
       });
       
-      if (daysWithFactor > 0) {
+      // Only assign sentiment labels when factor has 3+ logged days with mood data
+      if (daysWithFactor >= 3) {
         const avgMood = totalMood / daysWithFactor;
         let impact: "uplifting" | "neutral" | "draining" = "neutral";
         if (avgMood >= 5) impact = "uplifting";
@@ -51,7 +52,7 @@ export const InfluenceTracking = ({
         
         influences.push({ factor, impact, avgMoodWhenUsed: avgMood });
       } else {
-        influences.push({ factor, impact: "neutral", avgMoodWhenUsed: 4 });
+        influences.push({ factor, impact: "neutral", avgMoodWhenUsed: daysWithFactor > 0 ? totalMood / daysWithFactor : 4 });
       }
     });
     
@@ -129,7 +130,7 @@ export const InfluenceTracking = ({
               <div>
                 <p className="text-xs text-emerald-400/80 font-medium mb-2 flex items-center gap-1.5">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400" />
-                  Most uplifting
+                  Often lifting
                 </p>
                 <div className="space-y-2">
                   {uplifting.map(({ factor }) => (
@@ -147,10 +148,6 @@ export const InfluenceTracking = ({
             {/* Neutral */}
             {neutral.length > 0 && (
               <div>
-                <p className="text-xs text-muted-foreground font-medium mb-2 flex items-center gap-1.5">
-                  <span className="w-1.5 h-1.5 rounded-full bg-muted-foreground" />
-                  Neutral influence
-                </p>
                 <div className="space-y-2">
                   {neutral.map(({ factor }) => (
                     <FactorRow 
@@ -164,7 +161,7 @@ export const InfluenceTracking = ({
               </div>
             )}
             
-            {/* Draining */}
+            {/* Draining — only shown when factor has 3+ logged days with mood data */}
             {draining.length > 0 && (
               <div>
                 <p className="text-xs text-orange-400/80 font-medium mb-2 flex items-center gap-1.5">
@@ -182,6 +179,13 @@ export const InfluenceTracking = ({
                   ))}
                 </div>
               </div>
+            )}
+
+            {/* Hint when no labels qualify yet */}
+            {uplifting.length === 0 && draining.length === 0 && (
+              <p className="text-muted-foreground/60 text-xs mt-2">
+                Sentiment labels (e.g. "Often draining") only show after 3+ logged uses with mood data
+              </p>
             )}
           </div>
         ) : (

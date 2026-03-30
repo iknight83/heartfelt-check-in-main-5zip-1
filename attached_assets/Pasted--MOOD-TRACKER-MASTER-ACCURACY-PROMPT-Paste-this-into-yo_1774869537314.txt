@@ -1,0 +1,329 @@
+# MOOD TRACKER — MASTER ACCURACY PROMPT
+# Paste this into your Replit AI assistant, or use it as a system prompt
+# when asking any AI to build / fix features in your app.
+
+---
+
+You are building a mood tracking app. Every number, label, chart, score,
+and insight must be mathematically accurate and honestly gated behind
+minimum data thresholds. Never show a metric until there is enough real
+data to make it meaningful. Never fabricate correlations or sentiment labels.
+Follow every rule below exactly.
+
+---
+
+## SECTION 1 — DATA GATES (minimum entries before showing anything)
+
+Apply these gates across the ENTIRE app. If the threshold is not met,
+show a progress bar and the message defined below — nothing else.
+
+| Feature                     | Minimum entries required | Message to show                                      |
+|-----------------------------|--------------------------|------------------------------------------------------|
+| Mood Timeline chart         | 3 entries                | "Log 3 moods to see your timeline"                   |
+| Emotional Breakdown bars    | 3 entries                | "Log 3 moods to see your breakdown"                  |
+| Consistency Score number    | 7 entries                | "Score unlocks after 7 check-ins"                    |
+| Trigger sentiment labels    | 3 uses of that trigger WITH mood data on those days | "Log more to see impact"  |
+| Factor correlation delta    | 5 days with factor logged + 5 days without          | Show "not enough data"    |
+| Weekday breakdown           | 2 entries per day of week (14+ total)               | Hide empty days           |
+| Time-of-day breakdown       | 3 entries per bucket                                | Hide empty buckets        |
+| "Patterns You Might Miss"   | 14 entries               | Hide section entirely                                |
+| PRO — Emotional Forecasting | 21 entries               | Show locked state with progress                      |
+| PRO — AI Reflections        | 7 entries in current month | Show locked state with progress                    |
+| PRO — Long-term Trends      | 2 full calendar months of data | Show locked state with progress              |
+| PRO — Trigger Patterns      | 10 entries + 3 trigger uses | Show locked state with progress                   |
+
+IMPORTANT: A "check-in" only counts if moodLevel (1–5) was saved.
+Entries with only a note but no mood level must NOT count toward any threshold.
+
+---
+
+## SECTION 2 — STREAK LOGIC (exact algorithm)
+
+```
+function calculateStreak(entriesByDate, todayDateStr):
+  streak = 0
+  cursor = today
+
+  // Don't penalise the user if they haven't logged today yet
+  if todayDateStr NOT in entriesByDate:
+    cursor = yesterday
+
+  loop:
+    dateStr = toLocalDateString(cursor)   // ALWAYS use LOCAL timezone, never UTC
+    if dateStr NOT in entriesByDate: break
+    streak += 1
+    cursor = cursor - 1 day
+    if streak > 3650: break              // safety cap
+
+  return streak
+```
+
+Rules:
+- Use the device's LOCAL timezone for all date calculations — never UTC.
+  A log at 11 PM SAST must record as that local date, not the next UTC date.
+- A streak day = any day with at least 1 saved mood entry.
+- The streak does NOT reset if today has no entry yet (the day is not over).
+- The streak DOES reset if yesterday AND today both have no entry.
+- Display streak as an integer. Never show decimals.
+
+---
+
+## SECTION 3 — MOOD TIMELINE CHART (exact rendering rules)
+
+Chart type: vertical bar chart (one bar per calendar day in the month).
+
+Bar height mapping:
+- moodLevel 1 (Low)   → bar height 20% of chart area, color #ef4444
+- moodLevel 2 (Bad)   → bar height 40%, color #f97316
+- moodLevel 3 (Okay)  → bar height 60%, color #3b82f6
+- moodLevel 4 (Good)  → bar height 80%, color #10b981
+- moodLevel 5 (Great) → bar height 100%, color #22c55e
+- No entry that day   → bar height 10%, color #1e2d45 (dim placeholder)
+
+If a day has multiple entries, compute the average moodLevel (round to 1 dp),
+then use the color of Math.round(average).
+
+X-axis: show day numbers 1–31 (skip days that don't exist for that month).
+Y-axis: hidden. No numbers on Y axis.
+Tooltip on tap: show "Day {N} · {MoodLabel} · {time}" for each entry that day.
+Legend: Low / Okay / Great color dots + "no entry" grey dot, shown below chart.
+
+Do NOT show emoji icons in or near the chart — use colored bars only.
+
+---
+
+## SECTION 4 — EMOTIONAL BREAKDOWN (exact rendering rules)
+
+Always render ALL 5 mood levels (Low, Bad, Okay, Good, Great) as separate rows,
+even if count = 0.
+
+Row format:
+  [Mood label]    [count] entries · [percentage]%
+  [colored progress bar, width = percentage%]
+
+Percentage = (count for this level / total entries in period) * 100
+Round to nearest whole number. If total = 0, show 0% for all.
+
+Colors:
+- Low   #ef4444
+- Bad   #f97316
+- Okay  #3b82f6
+- Good  #10b981
+- Great #22c55e
+
+Show at the bottom: "Based on {N} entries" in muted text.
+Never show "100%" for one level without also showing the 0% rows for all others.
+
+---
+
+## SECTION 5 — CONSISTENCY SCORE (exact algorithm)
+
+```
+function consistencyScore(moodLevels):
+  if moodLevels.length < 7: return null   // DO NOT show score, show locked state
+
+  mean = sum(moodLevels) / moodLevels.length
+  variance = sum((x - mean)^2 for x in moodLevels) / moodLevels.length
+  sd = sqrt(variance)
+  MAX_SD = 2.0   // max possible SD on a 1–5 scale
+  score = round(max(0, min(100, (1 - sd / MAX_SD) * 100)))
+  return score
+```
+
+Display rules:
+- Score 80–100: label "Very stable" in green
+- Score 60–79:  label "Fairly steady" in blue
+- Score 40–59:  label "Some variation" in amber
+- Score 0–39:   label "High variability" in red
+- Below 7 entries: show "Score unlocks after 7 check-ins" + progress bar
+  showing (current entries / 7) as a fraction.
+
+The bar chart visualization (those waveform bars) should reflect the ACTUAL
+mood values across the month — each bar = one day's average mood level,
+height proportional to level (1–5). Do NOT show uniform-height bars.
+
+---
+
+## SECTION 6 — INFLUENCE TRACKING (exact accuracy rules)
+
+For each tracked factor, show:
+1. How many times it was logged today (integer count, never a decimal)
+2. A sentiment label ONLY when these conditions are ALL true:
+   - The factor was logged on at least 3 different days
+   - Each of those days also has a mood entry
+   - The average mood on "factor days" differs from "non-factor days" by >= 0.3 points
+
+Sentiment label logic:
+  delta = avgMoodWithFactor - avgMoodWithoutFactor
+  if delta >= 0.5:  label = "Often lifting"   color = green
+  if delta >= 0.3:  label = "Slightly lifting" color = teal
+  if delta <= -0.5: label = "Often draining"  color = red
+  if delta <= -0.3: label = "Slightly draining" color = orange
+  otherwise:        show NO label (not enough evidence)
+
+NEVER show "Often draining" when count = 0. NEVER show any label when
+the factor has fewer than 3 logged days with accompanying mood data.
+
+Week selector (Mo Tu We Th Fr Sa Su):
+- Highlight today's day.
+- Dot below a day = at least 1 factor was logged that day.
+- No dot = nothing logged. Do not show fake dots.
+
+---
+
+## SECTION 7 — EMPTY STATES (consolidation rule)
+
+When multiple sections have no data, do NOT show each section with its own
+empty state message. Instead:
+
+If 3 or more consecutive sections have no data:
+  Collapse them ALL into ONE card that says:
+  "Keep logging to see patterns"
+  Subtitle: "Trigger impact, time-of-day moods, and weekly patterns
+  all need 7+ check-ins to surface accurately."
+  Progress indicators: show (current / required) for each locked metric.
+
+Individual section empty states (shown when ONLY that section lacks data):
+  Mood Timeline:         "No entries this month yet"
+  Emotional Breakdown:   "Log 3 moods to see your breakdown"
+  Consistency Score:     "Score unlocks after 7 check-ins — {N}/7"
+  Influence Tracking:    "Add triggers to your entries to see their impact"
+  Patterns:              "Patterns emerge after 14 check-ins"
+
+---
+
+## SECTION 8 — PRO INSIGHTS (exact accuracy requirements)
+
+These features are behind a paywall. When LOCKED, show a compact card
+(NOT a blurred full section) with: feature name, one-line description,
+and progress toward unlock. When UNLOCKED, every calculation below must
+be accurate.
+
+### PRO 1: Emotional Forecasting
+
+Algorithm:
+1. Compute a 7-day rolling average of moodLevel.
+2. Compute the slope of the last 7 averages using linear regression:
+   slope = (n*Σ(i*y) - Σi*Σy) / (n*Σ(i²) - (Σi)²)
+   where i = day index (0–6), y = rolling average for that day, n = 7
+3. Project the next 3 days by extending the slope:
+   forecast[day+1] = lastAvg + slope * 1
+   forecast[day+2] = lastAvg + slope * 2
+   forecast[day+3] = lastAvg + slope * 3
+4. Clamp all forecast values to [1, 5].
+
+Display:
+- Show last 14 days of actual mood as a line chart.
+- Show next 3 days as a DASHED line in a lighter color.
+- Label the forecasted mood level (e.g. "Likely Okay tomorrow").
+- Add disclaimer: "Forecast based on recent trend, not a prediction."
+- Gate: requires 21 entries. Under 21, show locked card + progress.
+
+### PRO 2: AI Reflections
+
+Generate a reflection using ONLY the user's own entry data for the current month.
+The reflection must:
+- Reference the actual dominant mood (most frequent moodLevel)
+- Reference any notable day (highest mood, lowest mood)
+- Reference the most used trigger (if any)
+- Reference the user's own note text (if notes exist, quote max 5 words)
+- NOT compare the user to other users
+- NOT make clinical diagnoses or medical claims
+- NOT use language like "you seem depressed" or "you should see a doctor"
+- End with one constructive, non-judgmental observation
+
+Format:
+  Dominant mood this month: {label}
+  Standout day: {date} — {mood}
+  "{truncated note snippet if exists}"
+  One-sentence observation: {generated text}
+
+Gate: requires 7 entries in current month.
+
+### PRO 3: Long-term Trends
+
+Show a monthly mood average chart spanning all months with data.
+Each data point = (month average moodLevel, rounded to 1 dp).
+Minimum 2 complete calendar months needed to draw any trend line.
+
+Calculations:
+  monthlyAvg = sum(all entry moodLevels in month) / count
+  trendDirection = if last month avg > first month avg: "improving"
+                   if last month avg < first month avg: "declining"
+                   else: "stable"
+
+Display:
+- Line chart: X = months, Y = avg mood (1–5 scale, labeled)
+- Color the line green if trendDirection = improving, red if declining, grey if stable
+- Show percentage change: ((latestMonth - firstMonth) / firstMonth) * 100
+- Show best month and worst month labels on chart
+- Gate: requires 2+ full calendar months of data
+
+### PRO 4: Trigger Patterns (deep analysis)
+
+For each trigger the user has ever selected, compute:
+  totalUses         = count of entries where this trigger was selected
+  avgMoodWith       = mean moodLevel on entries WITH this trigger
+  avgMoodWithout    = mean moodLevel on entries WITHOUT this trigger
+  delta             = avgMoodWith - avgMoodWithout
+  correlation       = "strong positive" if delta >= 1.0
+                    = "moderate positive" if delta >= 0.5
+                    = "weak positive" if delta >= 0.3
+                    = "no clear link" if |delta| < 0.3
+                    = "weak negative" if delta <= -0.3
+                    = "moderate negative" if delta <= -0.5
+                    = "strong negative" if delta <= -1.0
+  confidence        = "low" if totalUses < 5
+                    = "medium" if totalUses 5–14
+                    = "high" if totalUses >= 15
+
+Display:
+- Ranked list from most positive to most negative delta
+- For each trigger: icon, name, delta ("+0.8" or "-1.2"), correlation label, confidence badge
+- Show confidence badge prominently — never show high-confidence claims on < 5 uses
+- Footer: "Correlations are not causes. Many factors affect mood."
+- Gate: requires 10 entries + 3 uses of at least one trigger
+
+---
+
+## SECTION 9 — GENERAL ACCURACY RULES (apply everywhere)
+
+1. ALL dates use the device's LOCAL timezone. No UTC anywhere in the UI.
+2. ALL displayed numbers must be rounded:
+   - Integers (streak, counts): Math.round()
+   - Percentages: Math.round() → "73%" not "72.6%"
+   - Averages shown to user: toFixed(1) → "3.4" not "3.41666..."
+   - Deltas: toFixed(1) → "+0.8" not "+0.833..."
+   - Scores (consistency): Math.round() → "74" not "74.2"
+3. NEVER show a sentiment label (draining/lifting) based on 0 or 1 data points.
+4. NEVER fabricate entries, streaks, or correlation values for demo purposes.
+5. NEVER show a 100% consistency score with fewer than 7 entries.
+6. NEVER show the "Often draining" label when a factor count = 0.
+7. Empty sections collapse into ONE unified empty state (see Section 7).
+8. Progress bars for locked features must reflect real (current / required) ratios.
+9. The Pro blur overlay must be replaced with compact feature cards — max 4 rows tall.
+10. When a month has 0 entries, show "No entries for {Month}" — not a blank chart.
+
+---
+
+## SECTION 10 — COPY / LANGUAGE RULES
+
+These phrases are BANNED from the app:
+- "You seem depressed" or any clinical diagnosis language
+- "You should see a doctor / therapist" (suggest it gently only if user asks)
+- Any comparison to "other users" or "people like you"
+- "Your data shows you are X type of person"
+- Fabricated quotes or example entries used as if real
+
+These phrases are ENCOURAGED:
+- "Based on your {N} entries this month..."
+- "This is a correlation, not a cause."
+- "Log more to improve accuracy."
+- "Patterns become clearer with more data."
+- Specific references to the user's own data only (their mood labels, their notes)
+
+Tone: calm, non-judgmental, factual. Like a thoughtful journal — not a diagnostics tool.
+
+---
+
+END OF PROMPT

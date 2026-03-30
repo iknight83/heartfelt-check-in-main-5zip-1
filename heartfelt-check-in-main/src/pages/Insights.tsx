@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth } from "date-fns";
-import { ChevronDown, Download } from "lucide-react";
+import { ChevronDown, Download, Sprout } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
 import BottomNav from "@/components/home/BottomNav";
 import { getMoodHistory, MoodEntry } from "@/hooks/useMoodState";
 import { getTrackedFactors } from "@/hooks/useTrackedFactors";
@@ -251,7 +252,6 @@ const Insights = () => {
 
         {/* Emotional Breakdown (Graphic-Based) */}
         <EmotionBreakdown 
-          emotionDistribution={emotionDistribution}
           moodsByDay={moodsByDay}
         />
 
@@ -263,7 +263,7 @@ const Insights = () => {
         />
 
         {/* Emotional Consistency Score */}
-        <EmotionalConsistency stability={stability} />
+        <EmotionalConsistency stability={stability} entryCount={monthMoods.length} />
 
         {/* Influence Tracking (Factors → Mood) */}
         <InfluenceTracking 
@@ -276,29 +276,61 @@ const Insights = () => {
           calendarRef={calendarRef}
         />
 
-        {/* NEW: Trigger Summary Card - What Influenced Your Mood */}
-        <TriggerSummary
-          triggerImpacts={triggerInsights.triggerImpacts}
-          topPositive={triggerInsights.topPositive}
-          topNegative={triggerInsights.topNegative}
-          hasEnoughData={triggerInsights.hasEnoughTriggerData}
-          progressMessage={triggerInsights.progressMessage}
-          contextQuality={triggerInsights.contextQuality}
-          baselineDrift={triggerInsights.baselineDrift}
-          daysTracked={triggerInsights.daysTracked}
-          phaseDescription={triggerInsights.phaseDescription}
-        />
-
-        {/* Trigger-Driven Patterns */}
-        <TriggerPatterns
-          patterns={triggerInsights.patterns}
-          hasEnoughTriggerData={triggerInsights.hasEnoughTriggerData}
-          hasEnoughMoodData={triggerInsights.hasEnoughMoodData}
-          daysWithTriggerData={triggerInsights.daysWithTriggerData}
-          unattributedPatterns={triggerInsights.unattributedPatterns}
-          daysTracked={triggerInsights.daysTracked}
-          phaseDescription={triggerInsights.phaseDescription}
-        />
+        {/* Trigger Summary + Patterns — consolidated when insufficient data */}
+        {triggerInsights.hasEnoughMoodData ? (
+          <>
+            <TriggerSummary
+              triggerImpacts={triggerInsights.triggerImpacts}
+              topPositive={triggerInsights.topPositive}
+              topNegative={triggerInsights.topNegative}
+              hasEnoughData={triggerInsights.hasEnoughTriggerData}
+              progressMessage={triggerInsights.progressMessage}
+              contextQuality={triggerInsights.contextQuality}
+              baselineDrift={triggerInsights.baselineDrift}
+              daysTracked={triggerInsights.daysTracked}
+              phaseDescription={triggerInsights.phaseDescription}
+            />
+            <TriggerPatterns
+              patterns={triggerInsights.patterns}
+              hasEnoughTriggerData={triggerInsights.hasEnoughTriggerData}
+              hasEnoughMoodData={triggerInsights.hasEnoughMoodData}
+              daysWithTriggerData={triggerInsights.daysWithTriggerData}
+              unattributedPatterns={triggerInsights.unattributedPatterns}
+              daysTracked={triggerInsights.daysTracked}
+              phaseDescription={triggerInsights.phaseDescription}
+            />
+          </>
+        ) : (
+          <Card className="bg-card/60 backdrop-blur-sm border-border/40">
+            <CardContent className="p-5">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Sprout className="w-4 h-4 text-green-400" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-foreground font-semibold text-sm mb-1">Keep logging to see patterns</p>
+                  <p className="text-muted-foreground text-xs leading-relaxed mb-3">
+                    Trigger correlations, time-of-day moods and weekly patterns all need 7+ check-ins to surface accurately.
+                  </p>
+                  <div className="flex items-center gap-3">
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-accent" />
+                      <span className="text-muted-foreground text-xs">
+                        {triggerInsights.daysTracked}/7 days
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="w-1.5 h-1.5 rounded-full bg-accent/60" />
+                      <span className="text-muted-foreground text-xs">
+                        {factors.length} factor{factors.length !== 1 ? "s" : ""} tracked
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Pro-Only Preview Sections - Now with real data */}
         <ProPreview 

@@ -2,7 +2,6 @@ import { useMemo } from "react";
 import { format, getDaysInMonth, startOfMonth, addDays } from "date-fns";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Users, Briefcase, MapPin, Globe, Tag, AlertCircle } from "lucide-react";
 
 interface MoodEntry {
   id: string;
@@ -17,119 +16,87 @@ interface MoodTimelineWithTriggersProps {
   selectedMonth: Date;
 }
 
-// Trigger type icons
-const getTriggerIcon = (trigger: string) => {
-  const peopleWords = ["myself", "partner", "family", "friends", "colleagues"];
-  const activityWords = ["work", "training", "hobby", "resting", "studying", "music", "tv", "physical", "exercise"];
-  const placeWords = ["home", "office", "school", "university"];
-  const externalWords = ["news", "economy", "social media", "weather"];
-  
-  const lowerTrigger = trigger.toLowerCase();
-  
-  if (peopleWords.some(w => lowerTrigger.includes(w))) return Users;
-  if (activityWords.some(w => lowerTrigger.includes(w))) return Briefcase;
-  if (placeWords.some(w => lowerTrigger.includes(w))) return MapPin;
-  if (externalWords.some(w => lowerTrigger.includes(w))) return Globe;
-  return Tag;
+const MOOD_COLORS: Record<string, string> = {
+  "Awful": "#ef4444", "Angry": "#ef4444", "Frustrated": "#ef4444", "Overwhelmed": "#ef4444",
+  "Drained": "#ef4444", "Hopeless": "#ef4444", "Broken": "#ef4444", "Devastated": "#ef4444", "Miserable": "#ef4444",
+  "Low": "#f97316", "Sad": "#f97316", "Irritated": "#f97316", "Worried": "#f97316",
+  "Embarrassed": "#f97316", "Down": "#f97316", "Anxious": "#f97316", "Lonely": "#f97316", "Stressed": "#f97316",
+  "Meh": "#a855f7", "Uninspired": "#a855f7", "Restless": "#a855f7", "Indifferent": "#a855f7",
+  "Tired": "#a855f7", "Bored": "#a855f7", "Distracted": "#a855f7", "Unfocused": "#a855f7", "Flat": "#a855f7",
+  "Okay": "#3b82f6", "Ok": "#3b82f6", "Calm": "#3b82f6", "Steady": "#3b82f6",
+  "Balanced": "#3b82f6", "Peaceful": "#3b82f6", "Easygoing": "#3b82f6", "Neutral": "#3b82f6", "Stable": "#3b82f6", "Fine": "#3b82f6",
+  "Nice": "#06b6d4", "Relaxed": "#06b6d4", "Comfortable": "#06b6d4", "Hopeful": "#06b6d4",
+  "Lively": "#06b6d4", "Content": "#06b6d4", "Pleasant": "#06b6d4", "Optimistic": "#06b6d4", "Cheerful": "#06b6d4",
+  "Great": "#22c55e", "Good": "#22c55e", "Happy": "#22c55e", "Joyful": "#22c55e",
+  "Satisfied": "#22c55e", "Motivated": "#22c55e", "Grateful": "#22c55e", "Energetic": "#22c55e", "Confident": "#22c55e", "Fulfilled": "#22c55e",
+  "Amazing": "#eab308", "Thrilled": "#eab308", "Radiant": "#eab308", "Inspired": "#eab308",
+  "Alive": "#eab308", "Ecstatic": "#eab308", "Blissful": "#eab308", "Euphoric": "#eab308", "Empowered": "#eab308",
 };
 
-// Mood level to color mapping
-const getMoodColor = (level: number, label?: string): string => {
-  const labelColors: Record<string, string> = {
-    "Awful": "hsl(0, 70%, 55%)",
-    "Angry": "hsl(0, 70%, 55%)",
-    "Bad": "hsl(330, 60%, 55%)",
-    "Sad": "hsl(330, 60%, 55%)",
-    "Low": "hsl(330, 60%, 55%)",
-    "Meh": "hsl(270, 55%, 55%)",
-    "Uninspired": "hsl(270, 55%, 55%)",
-    "Okay": "hsl(210, 70%, 55%)",
-    "Ok": "hsl(210, 70%, 55%)",
-    "Calm": "hsl(210, 70%, 55%)",
-    "Nice": "hsl(190, 80%, 50%)",
-    "Content": "hsl(190, 80%, 50%)",
-    "Cheerful": "hsl(160, 70%, 50%)",
-    "Good": "hsl(140, 60%, 50%)",
-    "Happy": "hsl(140, 60%, 50%)",
-    "Great": "hsl(140, 60%, 50%)",
-    "Amazing": "hsl(45, 90%, 50%)",
-    "Awesome": "hsl(45, 90%, 50%)",
-    "Thrilled": "hsl(45, 90%, 50%)",
-  };
-
-  if (label && labelColors[label]) {
-    return labelColors[label];
-  }
-
-  if (level <= 20) return "hsl(0, 70%, 55%)";
-  if (level <= 35) return "hsl(330, 60%, 55%)";
-  if (level <= 45) return "hsl(270, 55%, 55%)";
-  if (level <= 55) return "hsl(210, 70%, 55%)";
-  if (level <= 65) return "hsl(190, 80%, 50%)";
-  if (level <= 80) return "hsl(140, 60%, 50%)";
-  return "hsl(45, 90%, 50%)";
+const getMoodColor = (label: string, level: number): string => {
+  if (MOOD_COLORS[label]) return MOOD_COLORS[label];
+  if (level <= 1) return "#ef4444";
+  if (level <= 2) return "#f97316";
+  if (level <= 3) return "#a855f7";
+  if (level <= 4) return "#3b82f6";
+  if (level <= 5) return "#06b6d4";
+  if (level <= 6) return "#22c55e";
+  return "#eab308";
 };
+
+const levelToBarHeight = (level: number): number => {
+  return Math.round(Math.max(14, Math.min(100, (level / 7) * 100)));
+};
+
+const MIN_ENTRIES = 3;
 
 export const MoodTimelineWithTriggers = ({ moodEntries, selectedMonth }: MoodTimelineWithTriggersProps) => {
   const daysCount = getDaysInMonth(selectedMonth);
-  
-  // Group moods by day
+
   const moodsByDay = useMemo(() => {
     const map = new Map<number, MoodEntry[]>();
-    
     moodEntries.forEach(entry => {
       const entryDate = new Date(entry.timestamp);
-      if (entryDate.getMonth() === selectedMonth.getMonth() && 
-          entryDate.getFullYear() === selectedMonth.getFullYear()) {
+      if (
+        entryDate.getMonth() === selectedMonth.getMonth() &&
+        entryDate.getFullYear() === selectedMonth.getFullYear()
+      ) {
         const day = entryDate.getDate();
         if (!map.has(day)) map.set(day, []);
         map.get(day)!.push(entry);
       }
     });
-    
     return map;
   }, [moodEntries, selectedMonth]);
 
-  // Create array of days for the month
   const days = useMemo(() => {
     const start = startOfMonth(selectedMonth);
-    return Array.from({ length: daysCount }, (_, i) => {
-      const moods = moodsByDay.get(i + 1) || [];
-      const hasContext = moods.some(m => m.triggers && m.triggers.length > 0);
-      const allTriggers = moods.flatMap(m => m.triggers || []);
-      const uniqueTriggers = [...new Set(allTriggers)];
-      
-      return {
-        day: i + 1,
-        date: addDays(start, i),
-        moods,
-        hasContext,
-        triggers: uniqueTriggers,
-      };
-    });
+    return Array.from({ length: daysCount }, (_, i) => ({
+      day: i + 1,
+      date: addDays(start, i),
+      moods: moodsByDay.get(i + 1) || [],
+    }));
   }, [daysCount, selectedMonth, moodsByDay]);
 
-  // Count entries with/without context
-  const stats = useMemo(() => {
-    let withContext = 0;
-    let withoutContext = 0;
-    
-    days.forEach(d => {
-      d.moods.forEach(m => {
-        if (m.triggers && m.triggers.length > 0) withContext++;
-        else withoutContext++;
-      });
-    });
-    
-    return { withContext, withoutContext };
-  }, [days]);
+  const monthName = format(selectedMonth, "MMMM");
 
-  if (moodEntries.length === 0) {
+  if (moodEntries.length < MIN_ENTRIES) {
     return (
       <Card className="bg-card/60 backdrop-blur-sm border-border/40">
         <CardContent className="p-5">
-          <h2 className="text-foreground font-bold mb-3">Mood Timeline</h2>
-          <p className="text-muted-foreground text-sm">Start tracking to see your emotional journey.</p>
+          <h2 className="text-foreground font-bold mb-3">Mood Timeline — {monthName}</h2>
+          <div className="flex flex-col items-center py-4 gap-3">
+            <div className="h-1.5 rounded-full bg-border/30 w-full overflow-hidden">
+              <div
+                className="h-full rounded-full bg-accent/60 transition-all duration-500"
+                style={{ width: `${Math.min(100, (moodEntries.length / MIN_ENTRIES) * 100)}%` }}
+              />
+            </div>
+            <p className="text-muted-foreground text-sm text-center">
+              Log {MIN_ENTRIES} moods to see your timeline
+              <span className="text-accent font-medium"> ({moodEntries.length}/{MIN_ENTRIES})</span>
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -138,138 +105,55 @@ export const MoodTimelineWithTriggers = ({ moodEntries, selectedMonth }: MoodTim
   return (
     <Card className="bg-card/60 backdrop-blur-sm border-border/40 overflow-hidden">
       <CardContent className="p-5">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-foreground font-bold">Mood Timeline</h2>
-          {stats.withoutContext > 0 && (
-            <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20">
-              <AlertCircle className="w-3 h-3 text-amber-400" />
-              <span className="text-amber-400 text-[10px] font-medium">
-                {stats.withoutContext} without context
-              </span>
-            </div>
-          )}
-        </div>
-        
-        {/* Timeline strip with trigger overlay */}
+        <h2 className="text-foreground font-bold mb-4">Mood Timeline — {monthName}</h2>
+
         <TooltipProvider delayDuration={100}>
-          <div className="flex gap-[2px] items-end h-24">
-            {days.map(({ day, date, moods, hasContext, triggers }) => {
+          <div className="flex gap-[2px] items-end h-20">
+            {days.map(({ day, date, moods }) => {
               const hasEntry = moods.length > 0;
-              
-              const avgLevel = hasEntry 
-                ? moods.reduce((sum, m) => sum + m.level, 0) / moods.length 
+              const avgLevel = hasEntry
+                ? moods.reduce((sum, m) => sum + m.level, 0) / moods.length
                 : 0;
-              const barHeight = hasEntry ? Math.max(15, avgLevel) : 8;
-              const primaryMood = moods[0];
-              const color = hasEntry ? getMoodColor(avgLevel, primaryMood?.label) : undefined;
-              
+              const barH = hasEntry ? levelToBarHeight(avgLevel) : 10;
+              const primaryLabel = moods[0]?.label ?? "";
+              const color = hasEntry ? getMoodColor(primaryLabel, avgLevel) : undefined;
+
               return (
                 <Tooltip key={day}>
                   <TooltipTrigger asChild>
-                    <div className="flex-1 flex flex-col items-center gap-1 cursor-pointer group">
-                      {/* Trigger indicators (top layer) */}
-                      {hasEntry && triggers.length > 0 && (
-                        <div className="flex items-center justify-center gap-0.5 h-3 mb-0.5">
-                          {triggers.slice(0, 2).map((trigger, idx) => {
-                            const Icon = getTriggerIcon(trigger);
-                            return (
-                              <Icon 
-                                key={idx} 
-                                className="w-2.5 h-2.5 text-accent/70"
-                              />
-                            );
-                          })}
-                          {triggers.length > 2 && (
-                            <span className="text-[8px] text-muted-foreground">+{triggers.length - 2}</span>
-                          )}
-                        </div>
+                    <div className="flex-1 flex flex-col items-center gap-0.5 cursor-pointer group">
+                      <div
+                        className="w-full rounded-t-[2px] transition-all duration-300 group-hover:brightness-125"
+                        style={{
+                          height: `${barH}%`,
+                          backgroundColor: hasEntry ? color : "rgba(255,255,255,0.07)",
+                          boxShadow: hasEntry ? `0 0 6px ${color}50` : "none",
+                        }}
+                      />
+                      {day % 5 === 0 || day === 1 ? (
+                        <span className="text-[9px] text-muted-foreground/60 mt-0.5">{day}</span>
+                      ) : (
+                        <span className="text-[9px] text-transparent mt-0.5">{day}</span>
                       )}
-                      
-                      {/* No context indicator */}
-                      {hasEntry && !hasContext && (
-                        <div className="h-3 mb-0.5 flex items-center justify-center">
-                          <div className="w-1.5 h-1.5 rounded-full bg-amber-400/50" />
-                        </div>
-                      )}
-                      
-                      {/* Empty space for alignment when no entry */}
-                      {!hasEntry && <div className="h-3 mb-0.5" />}
-                      
-                      {/* Mood bars */}
-                      <div className="relative flex flex-col-reverse items-center gap-0.5 flex-1" style={{ height: `${barHeight}%` }}>
-                        {hasEntry ? (
-                          moods.slice(0, 3).map((mood, idx) => (
-                            <div
-                              key={mood.id}
-                              className={`w-full min-h-[4px] rounded-t-sm transition-all duration-300 group-hover:opacity-80 ${
-                                !mood.triggers?.length ? "opacity-50" : ""
-                              }`}
-                              style={{
-                                flex: 1,
-                                backgroundColor: getMoodColor(mood.level, mood.label),
-                                boxShadow: mood.triggers?.length 
-                                  ? `0 0 8px ${getMoodColor(mood.level, mood.label)}40`
-                                  : "none",
-                                opacity: mood.triggers?.length ? 1 - idx * 0.2 : 0.4,
-                              }}
-                            />
-                          ))
-                        ) : (
-                          <div className="w-full h-full rounded-t-sm bg-border/20" />
-                        )}
-                      </div>
-                      
-                      {/* Day number */}
-                      <span className={`text-[9px] transition-colors ${
-                        hasEntry 
-                          ? hasContext 
-                            ? 'text-muted-foreground' 
-                            : 'text-amber-400/60'
-                          : 'text-muted-foreground/40'
-                      }`}>
-                        {day}
-                      </span>
                     </div>
                   </TooltipTrigger>
-                  
+
                   {hasEntry && (
-                    <TooltipContent 
-                      side="top" 
-                      className="bg-card/95 backdrop-blur-sm border-border/50 max-w-[200px]"
+                    <TooltipContent
+                      side="top"
+                      className="bg-card/95 backdrop-blur-sm border-border/50 max-w-[180px]"
                     >
-                      <div className="text-xs space-y-2">
-                        <p className="font-medium text-foreground">
-                          {format(date, "d MMM")}
-                        </p>
-                        
+                      <div className="text-xs space-y-1.5">
+                        <p className="font-medium text-foreground">{format(date, "d MMM")}</p>
                         {moods.map(mood => (
-                          <div key={mood.id} className="space-y-1">
-                            <div className="flex items-center gap-2">
-                              <div 
-                                className="w-2 h-2 rounded-full" 
-                                style={{ backgroundColor: getMoodColor(mood.level, mood.label) }}
-                              />
-                              <span className="text-muted-foreground">
-                                {mood.label} ({format(new Date(mood.timestamp), "HH:mm")})
-                              </span>
-                            </div>
-                            
-                            {mood.triggers && mood.triggers.length > 0 ? (
-                              <div className="flex flex-wrap gap-1 ml-4">
-                                {mood.triggers.map((trigger, idx) => (
-                                  <span 
-                                    key={idx}
-                                    className="px-1.5 py-0.5 rounded bg-accent/10 text-accent text-[10px]"
-                                  >
-                                    {trigger}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : (
-                              <p className="text-amber-400/70 text-[10px] ml-4 italic">
-                                No context logged
-                              </p>
-                            )}
+                          <div key={mood.id} className="flex items-center gap-2">
+                            <div
+                              className="w-2 h-2 rounded-full flex-shrink-0"
+                              style={{ backgroundColor: getMoodColor(mood.label, mood.level) }}
+                            />
+                            <span className="text-muted-foreground">
+                              {mood.label} · {format(new Date(mood.timestamp), "HH:mm")}
+                            </span>
                           </div>
                         ))}
                       </div>
@@ -280,34 +164,19 @@ export const MoodTimelineWithTriggers = ({ moodEntries, selectedMonth }: MoodTim
             })}
           </div>
         </TooltipProvider>
-        
-        {/* Legend */}
-        <div className="flex items-center justify-between mt-4 pt-3 border-t border-border/20">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "hsl(0, 70%, 55%)" }} />
-              <span className="text-[10px] text-muted-foreground">Low</span>
+
+        <div className="flex items-center justify-center gap-4 mt-4 pt-3 border-t border-border/20">
+          {[
+            { label: "Low", color: "#ef4444" },
+            { label: "Okay", color: "#3b82f6" },
+            { label: "Great", color: "#22c55e" },
+            { label: "No entry", color: "rgba(255,255,255,0.1)" },
+          ].map(({ label, color }) => (
+            <div key={label} className="flex items-center gap-1.5">
+              <div className="w-2 h-2 rounded-full border border-white/10" style={{ backgroundColor: color }} />
+              <span className="text-[10px] text-muted-foreground">{label}</span>
             </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "hsl(210, 70%, 55%)" }} />
-              <span className="text-[10px] text-muted-foreground">Ok</span>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <div className="w-2 h-2 rounded-full" style={{ backgroundColor: "hsl(45, 90%, 50%)" }} />
-              <span className="text-[10px] text-muted-foreground">Great</span>
-            </div>
-          </div>
-          
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-1">
-              <Users className="w-2.5 h-2.5 text-accent/70" />
-              <span className="text-[9px] text-muted-foreground/60">= has context</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-1.5 h-1.5 rounded-full bg-amber-400/50" />
-              <span className="text-[9px] text-muted-foreground/60">= missing</span>
-            </div>
-          </div>
+          ))}
         </div>
       </CardContent>
     </Card>

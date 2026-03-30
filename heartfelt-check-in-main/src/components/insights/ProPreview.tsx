@@ -680,28 +680,43 @@ export const ProPreview = ({ moodEntries = [], trackedFactors = [] }: DeeperInsi
   // Get unique factor count
   const uniqueFactorCount = new Set(trackedFactors.map(f => f.name)).size;
 
+  if (!isUnlocked) {
+    return (
+      <div className="space-y-4">
+        <div className="flex items-center justify-between px-1">
+          <p className="text-foreground font-bold">Deeper Insights</p>
+          <span className="text-xs text-muted-foreground/70 px-2 py-1 rounded-full bg-muted/20 border border-border/20">
+            unlocks at 7 days
+          </span>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          <LockedFeatureCard
+            icon={Layers}
+            title="Trigger Patterns"
+            description="What actually changes your mood"
+          />
+          <LockedFeatureCard
+            icon={Brain}
+            title="AI Reflections"
+            description="Personalised weekly observations"
+          />
+          <LockedFeatureCard
+            icon={TrendingUp}
+            title="Long-term Trends"
+            description="Track progress over months"
+          />
+          <LockedFeatureCard
+            icon={Zap}
+            title="Emotional Forecasting"
+            description="Predict upcoming mood dips"
+          />
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4">
-      {/* Progress Indicator */}
-      {!isUnlocked && (
-        <Card className="bg-card/30 border-border/20">
-          <CardContent className="p-4">
-            <p className="text-muted-foreground text-sm text-center mb-3">
-              Deeper Insights become available with consistent tracking
-            </p>
-            <div className="flex gap-4 justify-center text-xs">
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${insights.uniqueDays >= 3 ? 'bg-emerald-400' : 'bg-muted'}`} />
-                <span className="text-muted-foreground">{insights.uniqueDays}/3 days</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className={`w-2 h-2 rounded-full ${uniqueFactorCount >= 2 ? 'bg-emerald-400' : 'bg-muted'}`} />
-                <span className="text-muted-foreground">{uniqueFactorCount}/2 factors</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Main Deeper Insights Card */}
       <Card className="bg-gradient-to-br from-card/80 to-card/40 backdrop-blur-sm border-border/40 overflow-hidden relative">
@@ -1091,21 +1106,6 @@ export const ProPreview = ({ moodEntries = [], trackedFactors = [] }: DeeperInsi
         </CardContent>
       </Card>
 
-      {/* Additional Locked Feature Cards */}
-      {!isUnlocked && (
-        <div className="grid grid-cols-2 gap-3">
-          <LockedFeatureCard 
-            icon={Activity}
-            title="Long-term Trends"
-            description="Track progress over months"
-          />
-          <LockedFeatureCard 
-            icon={Brain}
-            title="AI Reflections"
-            description="Personalized observations"
-          />
-        </div>
-      )}
     </div>
   );
 };
