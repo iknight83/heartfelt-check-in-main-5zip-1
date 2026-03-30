@@ -187,17 +187,53 @@ const MoodDetail = () => {
               <Plus className="w-6 h-6" />
             </div>
           </button>
-          <p className="text-muted-foreground/60 text-xs -mt-2">Add what influenced your mood</p>
+          <p className="text-muted-foreground/60 text-xs -mt-2">Tap to quick-add or press + for more</p>
+          {/* Quick-select chips */}
           <div className="flex flex-wrap gap-2">
-            {triggers.map((trigger) => (
-              <span
-                key={trigger}
-                className="px-4 py-2 rounded-full bg-card/60 text-foreground text-base font-medium border border-border/30"
-              >
-                {trigger}
-              </span>
-            ))}
+            {[
+              { label: "Sleep", emoji: "💤" },
+              { label: "Work", emoji: "💼" },
+              { label: "Exercise", emoji: "🏃" },
+              { label: "Food", emoji: "🍎" },
+              { label: "Social", emoji: "🤝" },
+              { label: "Weather", emoji: "🌤" },
+            ].map(({ label, emoji }) => {
+              const isActive = triggers.includes(label);
+              return (
+                <button
+                  key={label}
+                  onClick={() =>
+                    setTriggers((prev) =>
+                      isActive ? prev.filter((t) => t !== label) : [...prev, label]
+                    )
+                  }
+                  className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all duration-200 flex items-center gap-1.5 ${
+                    isActive
+                      ? "bg-accent/25 text-accent border border-accent/50"
+                      : "bg-card/40 text-muted-foreground border border-border/30 hover:bg-card/60 hover:text-foreground"
+                  }`}
+                >
+                  <span>{emoji}</span>
+                  <span>{label}</span>
+                </button>
+              );
+            })}
           </div>
+          {/* Selected triggers from full screen */}
+          {triggers.some(t => !["Sleep","Work","Exercise","Food","Social","Weather"].includes(t)) && (
+            <div className="flex flex-wrap gap-2">
+              {triggers
+                .filter(t => !["Sleep","Work","Exercise","Food","Social","Weather"].includes(t))
+                .map((trigger) => (
+                  <span
+                    key={trigger}
+                    className="px-4 py-2 rounded-full bg-card/60 text-foreground text-base font-medium border border-border/30"
+                  >
+                    {trigger}
+                  </span>
+                ))}
+            </div>
+          )}
         </div>
 
         {/* Save Button - show for new entries AND when editing existing */}

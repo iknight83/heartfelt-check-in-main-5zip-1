@@ -1,0 +1,720 @@
+/**
+ * ============================================================
+ *  MOOD TRACKER — COMPLETE DATA LAYER
+ *  Drop this file into your Replit src/ folder and import
+ *  the hooks/functions you need in your components.
+ *
+ *  Privacy: 100% localStorage — zero network calls made here.
+ *  Everything lives on the user's device.
+ * ============================================================
+ */
+
+// ─────────────────────────────────────────────
+// 1.  CONSTANTS & SCHEMA DOCUMENTATION
+// ─────────────────────────────────────────────
+
+export const MOOD_LEVELS = {
+  1: { label: "Low",   color: "#ef4444", emoji: "😔" },
+  2: { label: "Bad",   color: "#f97316", emoji: "😕" },
+  3: { label: "Okay",  color: "#3b82f6", emoji: "😐" },
+  4: { label: "Good",  color: "#10b981", emoji: "😊" },
+  5: { label: "Great", color: "#22c55e", emoji: "😄" },
+};
+
+export const DEFAULT_TRIGGERS = [
+  { id: "sleep",    label: "Sleep",    icon: "💤" },
+  { id: "work",     label: "Work",     icon: "💼" },
+  { id: "exercise", label: "Exercise", icon: "🏃" },
+  { id: "social",   label: "Social",   icon: "👥" },
+  { id: "food",     label: "Food",     icon: "🥗" },
+  { id: "weather",  label: "Weather",  icon: "☀️" },
+  { id: "family",   label: "Family",   icon: "🏠" },
+  { id: "health",   label: "Health",   icon: "❤️" },
+];
+
+export const DEFAULT_DESCRIPTORS_BY_LEVEL = {
+  1: ["Overwhelmed", "Drained", "Hopeless", "Anxious", "Stressed", "Tearful"],
+  2: ["Down", "Tired", "Unmotivated", "Irritable", "Worried", "Restless"],
+  3: ["Steady", "Balanced", "Peaceful", "Easygoing", "Calm", "Neutral", "Fine"],
+  4: ["Happy", "Energized", "Focused", "Grateful", "Motivated", "Content"],
+  5: ["Joyful", "Excited", "Proud", "Inspired", "Vibrant", "Euphoric", "Alive"],
+};
+
+export const STORAGE_KEYS = {
+  ENTRIES:          "moodtracker_entries",
+  TRACKING_FACTORS: "moodtracker_factors",
+  CUSTOM_TRIGGERS:  "moodtracker_custom_triggers",
+  SETTINGS:         "moodtracker_settings",
+};
+
+/**
+ * MoodEntry shape:
+ * {
+ *   id:              string    — crypto.randomUUID()
+ *   timestamp:       string    — ISO 8601, e.g. "2025-03-30T09:14:00.000Z"
+ *   date:            string    — "YYYY-MM-DD" (local time, used for grouping/streaks)
+ *   hour:            number    — 0-23 (local hour, used for time-of-day analysis)
+ *   moodLevel:       number    — 1-5
+ *   moodLabel:       string    — "Low" | "Bad" | "Okay" | "Good" | "Great"
+ *   descriptors:     string[]  — word chips the user tapped
+ *   note:            string    — free text
+ *   triggers:        string[]  — trigger IDs selected
+ *   factorSnapshot:  object    — { [factorName]: number } at time of entry
+ * }
+ *
+ * TrackingFactor shape:
+ * {
+ *   id:       string
+ *   name:     string
+ *   icon:     string  (emoji)
+ *   history:  { [YYYY-MM-DD]: number }
+ * }
+ */
+
+// ─────────────────────────────────────────────
+// 2.  LOW-LEVEL STORAGE HELPERS
+// ─────────────────────────────────────────────
+
+function safeGet(key, fallback) {
+  try {
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function safeSet(key, value) {
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+    return true;
+  } catch (e) {
+    console.error("Storage write failed:", e);
+    return false;
+  }
+}
+
+// ─────────────────────────────────────────────
+// 3.  DATE UTILITIES (local-time safe)
+// ─────────────────────────────────────────────
+
+/** Returns "YYYY-MM-DD" in the user's local timezone */
+export function toLocalDate(dateObj = new Date()) {
+  const y  = dateObj.getFullYear();
+  const m  = String(dateObj.getMonth() + 1).padStart(2, "0");
+  const d  = String(dateObj.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+/** "YYYY-MM-DD" → Date at midnight local */
+export function fromLocalDate(dateStr) {
+  const [y, m, d] = dateStr.split("-").map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** List of "YYYY-MM-DD" strings for the last N days inclusive (most recent last) */
+export function lastNDays(n = 7) {
+  return Array.from({ length: n }, (_, i) => {
+    const d = new Date();
+    d.setDate(d.getDate() - (n - 1 - i));
+    return toLocalDate(d);
+  });
+}
+
+/** "YYYY-MM-DD" → "Mon 30 Mar" */
+export function formatDateLabel(dateStr) {
+  return fromLocalDate(dateStr).toLocaleDateString("en-ZA", {
+    weekday: "short", day: "numeric", month: "short",
+  });
+}
+
+/** Returns the "time of day" bucket for a given hour */
+export function timeOfDayBucket(hour) {
+  if (hour >= 5  && hour < 12) return "Morning";
+  if (hour >= 12 && hour < 17) return "Afternoon";
+  if (hour >= 17 && hour < 21) return "Evening";
+  return "Night";
+}
+
+// ─────────────────────────────────────────────
+// 4.  ENTRY CRUD
+// ─────────────────────────────────────────────
+
+export function getAllEntries() {
+  return safeGet(STORAGE_KEYS.ENTRIES, []);
+}
+
+export function saveEntry(entry) {
+  // entry = { moodLevel, descriptors, note, triggers, factorSnapshot }
+  const now = new Date();
+  const newEntry = {
+    id:             crypto.randomUUID(),
+    timestamp:      now.toISOString(),
+    date:           toLocalDate(now),
+    hour:           now.getHours(),
+    moodLevel:      entry.moodLevel,
+    moodLabel:      MOOD_LEVELS[entry.moodLevel]?.label ?? "Unknown",
+    descriptors:    entry.descriptors  ?? [],
+    note:           (entry.note ?? "").trim(),
+    triggers:       entry.triggers     ?? [],
+    factorSnapshot: entry.factorSnapshot ?? {},
+  };
+
+  const entries = getAllEntries();
+  entries.push(newEntry);
+  safeSet(STORAGE_KEYS.ENTRIES, entries);
+  return newEntry;
+}
+
+export function updateEntry(id, patch) {
+  const entries = getAllEntries().map(e =>
+    e.id === id ? { ...e, ...patch, id } : e
+  );
+  safeSet(STORAGE_KEYS.ENTRIES, entries);
+}
+
+export function deleteEntry(id) {
+  const entries = getAllEntries().filter(e => e.id !== id);
+  safeSet(STORAGE_KEYS.ENTRIES, entries);
+}
+
+/** Entries grouped by date: { "YYYY-MM-DD": MoodEntry[] } */
+export function entriesByDate() {
+  return getAllEntries().reduce((acc, entry) => {
+    acc[entry.date] = acc[entry.date] ?? [];
+    acc[entry.date].push(entry);
+    return acc;
+  }, {});
+}
+
+/** Most recent entry for a given date */
+export function latestEntryForDate(dateStr) {
+  const group = entriesByDate()[dateStr];
+  if (!group?.length) return null;
+  return group.sort((a, b) => b.timestamp.localeCompare(a.timestamp))[0];
+}
+
+// ─────────────────────────────────────────────
+// 5.  TRACKING FACTORS CRUD
+// ─────────────────────────────────────────────
+
+export function getAllFactors() {
+  const defaults = [
+    { id: "mindfulness", name: "Mindfulness", icon: "🧘", history: {} },
+    { id: "sleep",       name: "Sleep quality", icon: "💤",  history: {} },
+    { id: "exercise",    name: "Exercise",     icon: "🏃",  history: {} },
+  ];
+  return safeGet(STORAGE_KEYS.TRACKING_FACTORS, defaults);
+}
+
+export function getFactorCountToday(factor) {
+  return factor.history[toLocalDate()] ?? 0;
+}
+
+export function incrementFactor(factorId, amount = 1) {
+  const factors = getAllFactors().map(f => {
+    if (f.id !== factorId) return f;
+    const today = toLocalDate();
+    const current = f.history[today] ?? 0;
+    return { ...f, history: { ...f.history, [today]: Math.max(0, current + amount) } };
+  });
+  safeSet(STORAGE_KEYS.TRACKING_FACTORS, factors);
+  return factors;
+}
+
+export function addFactor(name, icon = "✨") {
+  const factors = getAllFactors();
+  factors.push({ id: crypto.randomUUID(), name, icon, history: {} });
+  safeSet(STORAGE_KEYS.TRACKING_FACTORS, factors);
+  return factors;
+}
+
+export function removeFactor(factorId) {
+  const factors = getAllFactors().filter(f => f.id !== factorId);
+  safeSet(STORAGE_KEYS.TRACKING_FACTORS, factors);
+  return factors;
+}
+
+/** Snapshot of all factor values for today — used when saving an entry */
+export function buildFactorSnapshot() {
+  const today = toLocalDate();
+  return getAllFactors().reduce((acc, f) => {
+    acc[f.name] = f.history[today] ?? 0;
+    return acc;
+  }, {});
+}
+
+// ─────────────────────────────────────────────
+// 6.  STREAK CALCULATION
+//     A streak = consecutive days with ≥ 1 entry,
+//     counting backward from today (or yesterday if
+//     today has no entry yet, which is still a streak).
+// ─────────────────────────────────────────────
+
+export function calculateStreak() {
+  const byDate = entriesByDate();
+  const today = toLocalDate();
+  let streak = 0;
+  let cursor = new Date();
+
+  // If today has no entry yet, we don't break the streak — start from yesterday
+  if (!byDate[today]) {
+    cursor.setDate(cursor.getDate() - 1);
+  }
+
+  while (true) {
+    const dateStr = toLocalDate(cursor);
+    if (!byDate[dateStr]) break;
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+    // Safety cap at 3650 days
+    if (streak > 3650) break;
+  }
+
+  return streak;
+}
+
+/** Boolean array for the last 7 days — true means entry exists */
+export function weekCheckins() {
+  const byDate = entriesByDate();
+  return lastNDays(7).map(d => ({
+    date:       d,
+    hasEntry:   !!byDate[d],
+    entry:      latestEntryForDate(d),
+    isToday:    d === toLocalDate(),
+  }));
+}
+
+// ─────────────────────────────────────────────
+// 7.  INSIGHTS ENGINE
+// ─────────────────────────────────────────────
+
+/**
+ * Emotional Breakdown
+ * Returns count + percentage for each mood level (1-5) in a date range.
+ */
+export function emotionalBreakdown(entries) {
+  const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+  entries.forEach(e => { counts[e.moodLevel] = (counts[e.moodLevel] ?? 0) + 1; });
+  const total = entries.length || 1;
+  return Object.entries(counts).map(([level, count]) => ({
+    level:      Number(level),
+    label:      MOOD_LEVELS[level].label,
+    color:      MOOD_LEVELS[level].color,
+    count,
+    percentage: Math.round((count / total) * 100),
+  }));
+}
+
+/**
+ * Emotional Consistency Score (0–100)
+ *
+ * Algorithm:
+ * 1. Compute standard deviation of mood levels over the period.
+ * 2. Max possible SD with a 1-5 scale ≈ 2.0
+ * 3. Score = 100 − (SD / 2.0) × 100
+ * Higher score = more stable mood over time.
+ */
+export function consistencyScore(entries) {
+  if (entries.length < 2) return 50; // not enough data
+
+  const levels = entries.map(e => e.moodLevel);
+  const mean   = levels.reduce((s, v) => s + v, 0) / levels.length;
+  const variance = levels.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / levels.length;
+  const sd     = Math.sqrt(variance);
+  const MAX_SD = 2.0;
+  const score  = Math.round(Math.max(0, Math.min(100, (1 - sd / MAX_SD) * 100)));
+  return score;
+}
+
+/**
+ * Mood Timeline — daily averages for a date range
+ * Returns array of { date, avgLevel, entries, label }
+ */
+export function moodTimeline(days = 30) {
+  const byDate = entriesByDate();
+  return lastNDays(days).map(date => {
+    const dayEntries = byDate[date] ?? [];
+    const avg = dayEntries.length
+      ? dayEntries.reduce((s, e) => s + e.moodLevel, 0) / dayEntries.length
+      : null;
+    return {
+      date,
+      label:    formatDateLabel(date),
+      avgLevel: avg !== null ? Math.round(avg * 10) / 10 : null,
+      entries:  dayEntries,
+      hasData:  dayEntries.length > 0,
+      hasNote:  dayEntries.some(e => e.note.length > 0),
+    };
+  });
+}
+
+/**
+ * Influence Tracking
+ * For each trigger, computes the average mood level when that trigger was selected.
+ * Returns array sorted by average mood ascending (so you can see what tanks your mood).
+ */
+export function triggerInfluence(entries) {
+  const triggerStats = {};
+
+  entries.forEach(entry => {
+    entry.triggers.forEach(tid => {
+      if (!triggerStats[tid]) triggerStats[tid] = { sum: 0, count: 0 };
+      triggerStats[tid].sum   += entry.moodLevel;
+      triggerStats[tid].count += 1;
+    });
+  });
+
+  const allTriggers = [
+    ...DEFAULT_TRIGGERS,
+    ...(safeGet(STORAGE_KEYS.CUSTOM_TRIGGERS, []) ?? []),
+  ];
+
+  return Object.entries(triggerStats)
+    .map(([tid, { sum, count }]) => {
+      const meta = allTriggers.find(t => t.id === tid) ?? { label: tid, icon: "•" };
+      return {
+        id:       tid,
+        label:    meta.label,
+        icon:     meta.icon,
+        avgMood:  Math.round((sum / count) * 10) / 10,
+        count,
+      };
+    })
+    .sort((a, b) => a.avgMood - b.avgMood);
+}
+
+/**
+ * Time-of-day breakdown
+ * { Morning, Afternoon, Evening, Night } → { avgMood, count }
+ */
+export function timeOfDayBreakdown(entries) {
+  const buckets = { Morning: [], Afternoon: [], Evening: [], Night: [] };
+  entries.forEach(e => {
+    const bucket = timeOfDayBucket(e.hour);
+    buckets[bucket].push(e.moodLevel);
+  });
+  return Object.entries(buckets).map(([label, levels]) => ({
+    label,
+    count:   levels.length,
+    avgMood: levels.length
+      ? Math.round((levels.reduce((s, v) => s + v, 0) / levels.length) * 10) / 10
+      : null,
+  }));
+}
+
+/**
+ * Factor correlation
+ * Compares average mood on days with high factor usage vs. low/zero.
+ * threshold: a day is "high" if factor count >= threshold (default 1)
+ */
+export function factorMoodCorrelation(factorName, threshold = 1) {
+  const byDate = entriesByDate();
+  const factors = getAllFactors();
+  const factor  = factors.find(f => f.name === factorName);
+  if (!factor) return null;
+
+  const withFactor    = [];
+  const withoutFactor = [];
+
+  Object.entries(byDate).forEach(([date, dayEntries]) => {
+    const count = factor.history[date] ?? 0;
+    const avgMood = dayEntries.reduce((s, e) => s + e.moodLevel, 0) / dayEntries.length;
+    if (count >= threshold) {
+      withFactor.push(avgMood);
+    } else {
+      withoutFactor.push(avgMood);
+    }
+  });
+
+  const avg = arr =>
+    arr.length ? Math.round((arr.reduce((s, v) => s + v, 0) / arr.length) * 100) / 100 : null;
+
+  return {
+    factorName,
+    avgMoodWith:    avg(withFactor),
+    avgMoodWithout: avg(withoutFactor),
+    daysTracked:    withFactor.length,
+    daysWithout:    withoutFactor.length,
+    /** positive = factor correlates with better mood */
+    delta: avg(withFactor) !== null && avg(withoutFactor) !== null
+      ? Math.round((avg(withFactor) - avg(withoutFactor)) * 100) / 100
+      : null,
+  };
+}
+
+/**
+ * Best and worst days of the week across all entries
+ * Returns array of { day: "Monday", avgMood, count }
+ */
+export function weekdayBreakdown(entries) {
+  const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+  const buckets = Object.fromEntries(days.map(d => [d, []]));
+  entries.forEach(e => {
+    const d = fromLocalDate(e.date).getDay();
+    buckets[days[d]].push(e.moodLevel);
+  });
+  return days.map(day => ({
+    day,
+    count:   buckets[day].length,
+    avgMood: buckets[day].length
+      ? Math.round((buckets[day].reduce((s,v)=>s+v,0)/buckets[day].length)*10)/10
+      : null,
+  }));
+}
+
+// ─────────────────────────────────────────────
+// 8.  MONTH FILTER HELPER
+//     Use this to slice entries for the Insights tab
+// ─────────────────────────────────────────────
+
+export function entriesForMonth(year, month) {
+  // month is 1-indexed
+  const prefix = `${year}-${String(month).padStart(2,"0")}`;
+  return getAllEntries().filter(e => e.date.startsWith(prefix));
+}
+
+export function entriesForDateRange(fromDate, toDate) {
+  return getAllEntries().filter(e => e.date >= fromDate && e.date <= toDate);
+}
+
+// ─────────────────────────────────────────────
+// 9.  EXPORT  (JSON + CSV — stays on device)
+// ─────────────────────────────────────────────
+
+export function exportJSON() {
+  const data = {
+    exportedAt: new Date().toISOString(),
+    version:    1,
+    entries:    getAllEntries(),
+    factors:    getAllFactors(),
+  };
+  downloadFile(
+    "moodtracker-export.json",
+    JSON.stringify(data, null, 2),
+    "application/json"
+  );
+}
+
+export function exportCSV() {
+  const entries = getAllEntries();
+  if (!entries.length) return;
+
+  const headers = [
+    "date", "time", "moodLevel", "moodLabel",
+    "descriptors", "triggers", "note",
+    ...Object.keys(entries[0].factorSnapshot ?? {}),
+  ];
+
+  const rows = entries.map(e => [
+    e.date,
+    new Date(e.timestamp).toLocaleTimeString("en-ZA"),
+    e.moodLevel,
+    e.moodLabel,
+    `"${e.descriptors.join(", ")}"`,
+    `"${e.triggers.join(", ")}"`,
+    `"${(e.note ?? "").replace(/"/g, '""')}"`,
+    ...Object.values(e.factorSnapshot ?? {}),
+  ]);
+
+  const csv = [headers.join(","), ...rows.map(r => r.join(","))].join("\n");
+  downloadFile("moodtracker-export.csv", csv, "text/csv");
+}
+
+function downloadFile(filename, content, type) {
+  const blob = new Blob([content], { type });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+// ─────────────────────────────────────────────
+// 10.  DATA MANAGEMENT (privacy controls)
+// ─────────────────────────────────────────────
+
+/** Delete all entries and factor history permanently */
+export function deleteAllData() {
+  Object.values(STORAGE_KEYS).forEach(key => localStorage.removeItem(key));
+}
+
+/** Reset only the computed/cached insight data without touching raw entries */
+export function resetInsightsCache() {
+  // In this architecture insights are always recomputed from raw entries,
+  // so there's no separate cache to clear. This is a no-op placeholder
+  // in case you add a server-side insights cache in the future.
+  return true;
+}
+
+/** Import data from a previously exported JSON file */
+export function importFromJSON(jsonString) {
+  try {
+    const data = JSON.parse(jsonString);
+    if (!Array.isArray(data.entries)) throw new Error("Invalid format");
+
+    // Merge — existing entries with same ID are overwritten
+    const existing = getAllEntries();
+    const existingIds = new Set(existing.map(e => e.id));
+    const merged = [
+      ...existing,
+      ...data.entries.filter(e => !existingIds.has(e.id)),
+    ];
+    safeSet(STORAGE_KEYS.ENTRIES, merged);
+
+    if (Array.isArray(data.factors)) {
+      safeSet(STORAGE_KEYS.TRACKING_FACTORS, data.factors);
+    }
+    return { success: true, imported: data.entries.length };
+  } catch (e) {
+    return { success: false, error: e.message };
+  }
+}
+
+// ─────────────────────────────────────────────
+// 11.  REACT HOOKS (import in your components)
+// ─────────────────────────────────────────────
+
+import { useState, useEffect, useCallback } from "react";
+
+/**
+ * useMoodEntries — reactive list of all entries
+ *
+ * const { entries, addEntry, removeEntry, loading } = useMoodEntries();
+ */
+export function useMoodEntries() {
+  const [entries, setEntries] = useState(() => getAllEntries());
+
+  const refresh = useCallback(() => setEntries(getAllEntries()), []);
+
+  const addEntry = useCallback((data) => {
+    saveEntry(data);
+    refresh();
+  }, [refresh]);
+
+  const removeEntry = useCallback((id) => {
+    deleteEntry(id);
+    refresh();
+  }, [refresh]);
+
+  return { entries, addEntry, removeEntry, refresh };
+}
+
+/**
+ * useTrackingFactors — reactive tracking factor list with helpers
+ *
+ * const { factors, increment, addFactor: add, removeFactor: remove } = useTrackingFactors();
+ */
+export function useTrackingFactors() {
+  const [factors, setFactors] = useState(() => getAllFactors());
+
+  const refresh = useCallback(() => setFactors(getAllFactors()), []);
+
+  const increment = useCallback((id, amount = 1) => {
+    setFactors(incrementFactor(id, amount));
+  }, []);
+
+  const add = useCallback((name, icon) => {
+    setFactors(addFactor(name, icon));
+  }, []);
+
+  const remove = useCallback((id) => {
+    setFactors(removeFactor(id));
+  }, []);
+
+  return { factors, increment, add, remove, refresh };
+}
+
+/**
+ * useInsights — returns all computed insight values for a given month
+ *
+ * const insights = useInsights(2025, 3);
+ * insights.streak / insights.consistency / insights.breakdown / etc.
+ */
+export function useInsights(year, month) {
+  const [insights, setInsights] = useState(null);
+
+  useEffect(() => {
+    const entries = entriesForMonth(year, month);
+    setInsights({
+      entries,
+      streak:          calculateStreak(),
+      weekCheckins:    weekCheckins(),
+      breakdown:       emotionalBreakdown(entries),
+      consistency:     consistencyScore(entries),
+      timeline:        moodTimeline(30),
+      triggerImpact:   triggerInfluence(entries),
+      timeOfDay:       timeOfDayBreakdown(entries),
+      weekday:         weekdayBreakdown(entries),
+      factorCorrelations: getAllFactors().map(f =>
+        factorMoodCorrelation(f.name)
+      ).filter(Boolean),
+    });
+  }, [year, month]);
+
+  return insights;
+}
+
+// ─────────────────────────────────────────────
+// 12.  USAGE EXAMPLE (remove from production)
+// ─────────────────────────────────────────────
+
+/*
+
+// In your MoodEntry component:
+import { useMoodEntries, useTrackingFactors, buildFactorSnapshot } from "./moodTrackerCore";
+
+function MoodEntryScreen() {
+  const { addEntry } = useMoodEntries();
+  const { factors }  = useTrackingFactors();
+
+  const handleSave = (moodLevel, descriptors, note, triggers) => {
+    addEntry({
+      moodLevel,
+      descriptors,
+      note,
+      triggers,
+      factorSnapshot: buildFactorSnapshot(),  // captures today's factor counts
+    });
+    // navigate back to journal
+  };
+}
+
+// In your Insights screen:
+import { useInsights } from "./moodTrackerCore";
+
+function InsightsScreen() {
+  const now      = new Date();
+  const insights = useInsights(now.getFullYear(), now.getMonth() + 1);
+
+  if (!insights) return <Loading />;
+
+  return (
+    <>
+      <StreakBadge value={insights.streak} />
+      <ConsistencyScore value={insights.consistency} />
+      <MoodTimeline data={insights.timeline} />
+      <EmotionalBreakdown data={insights.breakdown} />
+      <TriggerInfluence data={insights.triggerImpact} />
+    </>
+  );
+}
+
+// In your Profile/Settings screen:
+import { exportJSON, exportCSV, deleteAllData, importFromJSON } from "./moodTrackerCore";
+
+function SettingsScreen() {
+  return (
+    <>
+      <button onClick={exportJSON}>Export JSON</button>
+      <button onClick={exportCSV}>Export CSV</button>
+      <button onClick={() => { if (confirm("Delete everything?")) deleteAllData(); }}>
+        Delete All Data
+      </button>
+    </>
+  );
+}
+
+*/

@@ -1,5 +1,6 @@
 import { useState, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { Button } from "@/components/ui/button";
 
 const MOOD_LEVELS = [
   { 
@@ -269,12 +270,12 @@ const MoodAdjust = () => {
       
       {/* Save Button */}
       <div className="px-5 pb-8 pt-4">
-        <button
+        <Button
           onClick={handleSave}
-          className="w-full py-4 bg-white text-background font-semibold rounded-2xl hover:bg-white/90 transition-colors"
+          className="w-full py-6 text-base font-semibold rounded-2xl"
         >
           Save
-        </button>
+        </Button>
       </div>
     </div>
   );
