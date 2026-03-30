@@ -162,6 +162,22 @@ The Free Trial option on the Paywall follows strict eligibility rules:
 7. **Trial Start**: When user clicks Free Trial, frontend calls `/api/paypal/trial/start` to create trial record
 8. **Error Handling**: Network failures default to hiding trial (safe) and show error if user tries to start expired trial
 
+## Insights Page Components (Mar 2026)
+
+The Insights page (`src/pages/Insights.tsx`) renders 8 spec-driven components in order:
+
+1. **MoodTimelineWithTriggers** — bar chart per day of month, colour = mood level
+2. **EmotionBreakdown** — always shows all 5 levels (Low/Bad/Okay/Good/Great), gated at 3 entries
+3. **ReflectiveCard** — dominant mood %, real note snippet, top triggers as descriptors, tone text + mood pills; gated at 3 entries
+4. **EmotionalConsistency** — SD-based score `(1 - sd/2.0) * 100`, 30-day waveform of actual daily avg bars; gated at 7 entries
+5. **InfluenceTracking** — lifestyle factor calendar strip + factor rows; per-factor `{n}/3 uses needed to show impact` sub-text
+6. **WhatInfluencedYourMood** — trigger delta bars centred at Okay (level 3), sorted by avg mood, low-confidence warning at <5 uses
+7. **PatternsYouMightMiss** — time-of-day bars (Morning/Afternoon/Evening/Night, gate 3 per bucket) + weekday bars (gate 2 per day); overall gate at 7 entries
+8. **ProPreview (DeeperInsights)** — non-subscriber: 2×2 grid of locked cards each with its own progress bar (Trigger Patterns: 10, AI Reflections: 7, Long-term Trends: 60, Forecasting: 21 entries)
+
+**Mood level mapping (1-7 app scale → 1-5 insight scale):**
+All insight components use `MOOD_TO_LEVEL5` map inline: levels 1-2 (Awful/Low) → 1-2, level 3 (Meh) → 3, levels 4-5 (Okay/Nice) → 4, levels 6-7 (Great/Amazing) → 5.
+
 ## External Dependencies
 
 ### Authentication & Backend

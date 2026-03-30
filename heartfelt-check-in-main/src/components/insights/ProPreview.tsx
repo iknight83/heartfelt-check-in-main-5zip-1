@@ -681,34 +681,50 @@ export const ProPreview = ({ moodEntries = [], trackedFactors = [] }: DeeperInsi
   const uniqueFactorCount = new Set(trackedFactors.map(f => f.name)).size;
 
   if (!isUnlocked) {
+    const totalEntries = moodEntries.length;
     return (
       <div className="space-y-4">
         <div className="flex items-center justify-between px-1">
-          <p className="text-foreground font-bold">Deeper Insights</p>
-          <span className="text-xs text-muted-foreground/70 px-2 py-1 rounded-full bg-muted/20 border border-border/20">
-            unlocks at 7 days
-          </span>
+          <p className="text-foreground font-bold">✦ Deeper Insights</p>
+          <button
+            onClick={() => navigate('/you')}
+            className="text-xs text-amber-400 px-2 py-1 rounded-full bg-amber-500/10 border border-amber-500/20"
+          >
+            🔒 View Pro
+          </button>
         </div>
         <div className="grid grid-cols-2 gap-3">
           <LockedFeatureCard
             icon={Layers}
             title="Trigger Patterns"
             description="What actually changes your mood"
+            totalEntries={totalEntries}
+            required={10}
+            accentColor="#3b82f6"
           />
           <LockedFeatureCard
             icon={Brain}
             title="AI Reflections"
             description="Personalised weekly observations"
+            totalEntries={totalEntries}
+            required={7}
+            accentColor="#a855f7"
           />
           <LockedFeatureCard
             icon={TrendingUp}
             title="Long-term Trends"
             description="Track progress over months"
+            totalEntries={totalEntries}
+            required={60}
+            accentColor="#06b6d4"
           />
           <LockedFeatureCard
             icon={Zap}
             title="Emotional Forecasting"
             description="Predict upcoming mood dips"
+            totalEntries={totalEntries}
+            required={21}
+            accentColor="#f59e0b"
           />
         </div>
       </div>
@@ -1113,22 +1129,40 @@ export const ProPreview = ({ moodEntries = [], trackedFactors = [] }: DeeperInsi
 const LockedFeatureCard = ({ 
   icon: Icon, 
   title, 
-  description 
+  description,
+  totalEntries,
+  required,
+  accentColor,
 }: { 
   icon: typeof Activity; 
   title: string; 
   description: string;
-}) => (
-  <Card className="bg-card/30 backdrop-blur-sm border-border/20 overflow-hidden relative group cursor-pointer hover:bg-card/40 transition-all duration-300">
-    <CardContent className="p-4">
-      <div className="flex items-start justify-between mb-2">
-        <div className="w-7 h-7 rounded-lg bg-muted/30 flex items-center justify-center">
-          <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+  totalEntries: number;
+  required: number;
+  accentColor: string;
+}) => {
+  const pct = Math.min(100, Math.round((totalEntries / required) * 100));
+  return (
+    <Card className="bg-card/30 backdrop-blur-sm border-border/20 overflow-hidden relative cursor-pointer hover:bg-card/40 transition-all duration-300">
+      <CardContent className="p-4">
+        <div className="flex items-start justify-between mb-2">
+          <div className="w-7 h-7 rounded-lg bg-muted/30 flex items-center justify-center">
+            <Icon className="w-3.5 h-3.5 text-muted-foreground" />
+          </div>
+          <Lock className="w-3 h-3 text-muted-foreground/50" />
         </div>
-        <Lock className="w-3 h-3 text-muted-foreground/50" />
-      </div>
-      <p className="text-foreground/70 text-xs font-medium">{title}</p>
-      <p className="text-muted-foreground/60 text-[10px]">{description}</p>
-    </CardContent>
-  </Card>
-);
+        <p className="text-foreground/70 text-xs font-medium mb-0.5">{title}</p>
+        <p className="text-muted-foreground/60 text-[10px] mb-2">{description}</p>
+        <div className="h-0.5 rounded-full bg-border/30 overflow-hidden">
+          <div
+            className="h-full rounded-full transition-all duration-500"
+            style={{ width: `${pct}%`, backgroundColor: accentColor }}
+          />
+        </div>
+        <p className="text-[9px] text-right mt-1" style={{ color: `${accentColor}90` }}>
+          {totalEntries}/{required} entries
+        </p>
+      </CardContent>
+    </Card>
+  );
+};

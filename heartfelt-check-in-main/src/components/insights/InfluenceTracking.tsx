@@ -25,7 +25,7 @@ export const InfluenceTracking = ({
 }: InfluenceTrackingProps) => {
   // Calculate factor influence categories
   const factorInfluence = useMemo(() => {
-    const influences: { factor: TrackedFactor; impact: "uplifting" | "neutral" | "draining"; avgMoodWhenUsed: number }[] = [];
+    const influences: { factor: TrackedFactor; impact: "uplifting" | "neutral" | "draining"; avgMoodWhenUsed: number; daysWithFactor: number }[] = [];
     
     factors.forEach(factor => {
       let totalMood = 0;
@@ -50,9 +50,9 @@ export const InfluenceTracking = ({
         if (avgMood >= 5) impact = "uplifting";
         else if (avgMood <= 3) impact = "draining";
         
-        influences.push({ factor, impact, avgMoodWhenUsed: avgMood });
+        influences.push({ factor, impact, avgMoodWhenUsed: avgMood, daysWithFactor });
       } else {
-        influences.push({ factor, impact: "neutral", avgMoodWhenUsed: daysWithFactor > 0 ? totalMood / daysWithFactor : 4 });
+        influences.push({ factor, impact: "neutral", avgMoodWhenUsed: daysWithFactor > 0 ? totalMood / daysWithFactor : 4, daysWithFactor });
       }
     });
     
@@ -133,12 +133,13 @@ export const InfluenceTracking = ({
                   Often lifting
                 </p>
                 <div className="space-y-2">
-                  {uplifting.map(({ factor }) => (
+                  {uplifting.map(({ factor, daysWithFactor }) => (
                     <FactorRow 
                       key={factor.id} 
                       factor={factor} 
                       selectedDate={selectedDate}
                       accentColor="hsl(145 80% 50%)"
+                      daysWithFactor={daysWithFactor}
                     />
                   ))}
                 </div>
@@ -149,12 +150,13 @@ export const InfluenceTracking = ({
             {neutral.length > 0 && (
               <div>
                 <div className="space-y-2">
-                  {neutral.map(({ factor }) => (
+                  {neutral.map(({ factor, daysWithFactor }) => (
                     <FactorRow 
                       key={factor.id} 
                       factor={factor} 
                       selectedDate={selectedDate}
                       accentColor="hsl(var(--accent))"
+                      daysWithFactor={daysWithFactor}
                     />
                   ))}
                 </div>
@@ -169,24 +171,20 @@ export const InfluenceTracking = ({
                   Often draining
                 </p>
                 <div className="space-y-2">
-                  {draining.map(({ factor }) => (
+                  {draining.map(({ factor, daysWithFactor }) => (
                     <FactorRow 
                       key={factor.id} 
                       factor={factor} 
                       selectedDate={selectedDate}
                       accentColor="hsl(30 90% 55%)"
+                      daysWithFactor={daysWithFactor}
                     />
                   ))}
                 </div>
               </div>
             )}
 
-            {/* Hint when no labels qualify yet */}
-            {uplifting.length === 0 && draining.length === 0 && (
-              <p className="text-muted-foreground/60 text-xs mt-2">
-                Sentiment labels (e.g. "Often draining") only show after 3+ logged uses with mood data
-              </p>
-            )}
+            {/* no global hint — per-factor progress shown inline */}
           </div>
         ) : (
           <p className="text-muted-foreground text-sm">Start tracking factors to see their influence.</p>
@@ -199,11 +197,13 @@ export const InfluenceTracking = ({
 const FactorRow = ({ 
   factor, 
   selectedDate, 
-  accentColor 
+  accentColor,
+  daysWithFactor,
 }: { 
   factor: TrackedFactor; 
   selectedDate: Date;
   accentColor: string;
+  daysWithFactor: number;
 }) => {
   const dayFactors = getFactorsForDate(selectedDate);
   const dayFactor = dayFactors.find(f => f.id === factor.id);
@@ -217,7 +217,14 @@ const FactorRow = ({
     <div className="flex items-center justify-between gap-3">
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-sm shrink-0">{factor.emoji}</span>
-        <span className="text-foreground text-xs font-medium truncate">{factor.name}</span>
+        <div className="min-w-0">
+          <span className="text-foreground text-xs font-medium truncate block">{factor.name}</span>
+          {daysWithFactor > 0 && daysWithFactor < 3 && (
+            <span className="text-muted-foreground/40 text-[10px] leading-none">
+              {daysWithFactor}/3 uses needed to show impact
+            </span>
+          )}
+        </div>
       </div>
       <div className="flex items-center gap-1">
         {dots.map((filled, idx) => (

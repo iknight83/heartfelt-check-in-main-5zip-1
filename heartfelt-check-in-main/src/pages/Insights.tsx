@@ -1,7 +1,6 @@
 import { useState, useMemo, useEffect, useRef } from "react";
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth } from "date-fns";
-import { ChevronDown, Download, Sprout } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { ChevronDown, Download } from "lucide-react";
 import BottomNav from "@/components/home/BottomNav";
 import { getMoodHistory, MoodEntry } from "@/hooks/useMoodState";
 import { getTrackedFactors } from "@/hooks/useTrackedFactors";
@@ -11,11 +10,11 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { MoodTimelineWithTriggers } from "@/components/insights/MoodTimelineWithTriggers";
 import { EmotionBreakdown } from "@/components/insights/EmotionBreakdown";
-import { DominantMoodSummary } from "@/components/insights/DominantMoodSummary";
+import { ReflectiveCard } from "@/components/insights/ReflectiveCard";
 import { EmotionalConsistency } from "@/components/insights/EmotionalConsistency";
 import { InfluenceTracking } from "@/components/insights/InfluenceTracking";
-import { TriggerSummary } from "@/components/insights/TriggerSummary";
-import { TriggerPatterns } from "@/components/insights/TriggerPatterns";
+import { WhatInfluencedYourMood } from "@/components/insights/WhatInfluencedYourMood";
+import { PatternsYouMightMiss } from "@/components/insights/PatternsYouMightMiss";
 import { ContextQualityWarning } from "@/components/insights/ContextQualityWarning";
 import { ProPreview } from "@/components/insights/ProPreview";
 
@@ -46,36 +45,7 @@ const getMoodInfo = (mood: string) => {
   return MOOD_LEVEL_COLORS[mood] || { color: "hsl(210, 70%, 55%)", level: 4, category: "neutral" as const };
 };
 
-// Generate mood summary text
-const getMoodSummary = (distribution: { mood: string; percentage: number; category: "positive" | "neutral" | "negative" }[]) => {
-  if (distribution.length === 0) return "Start tracking to see your emotional patterns.";
-  
-  const positive = distribution.filter(d => d.category === "positive").reduce((sum, d) => sum + d.percentage, 0);
-  const negative = distribution.filter(d => d.category === "negative").reduce((sum, d) => sum + d.percentage, 0);
-  const neutral = distribution.filter(d => d.category === "neutral").reduce((sum, d) => sum + d.percentage, 0);
-  
-  if (positive > 60) return "You spent most of this month feeling steady, with moments of calm and contentment.";
-  if (negative > 40) return "This month had some challenging moments. Remember, acknowledging difficulty is a sign of strength.";
-  if (neutral > 50) return "Your mood was mostly steady this month, with occasional emotional dips.";
-  return "Your emotional landscape this month was varied, reflecting life's natural rhythm.";
-};
-
-// Get personality label
-const getPersonalityLabel = (distribution: { mood: string; percentage: number; category: "positive" | "neutral" | "negative" }[]) => {
-  if (distribution.length === 0) return { label: "Unknown", description: "Track more moods to discover your emotional pattern." };
-  
-  const positive = distribution.filter(d => d.category === "positive").reduce((sum, d) => sum + d.percentage, 0);
-  const negative = distribution.filter(d => d.category === "negative").reduce((sum, d) => sum + d.percentage, 0);
-  const neutral = distribution.filter(d => d.category === "neutral").reduce((sum, d) => sum + d.percentage, 0);
-  
-  if (positive > 60) return { label: "Steady", description: "You tend to maintain a positive outlook with natural emotional balance." };
-  if (negative > 40) return { label: "Reflective", description: "You experience emotions deeply, which can lead to meaningful self-awareness." };
-  if (neutral > 60) return { label: "Balanced", description: "You tend to maintain emotional balance with brief mood fluctuations." };
-  if (distribution.length >= 4 && distribution[0].percentage < 40) return { label: "Dynamic", description: "Your emotions flow freely, adapting to life's varied experiences." };
-  return { label: "Balanced", description: "You experience a healthy range of emotions throughout your days." };
-};
-
-// Calculate emotional stability score
+// Calculate emotional stability score (kept for potential future use)
 const getStabilityScore = (moods: MoodEntry[]) => {
   if (moods.length < 2) return { score: 50, description: "Track more moods to measure consistency." };
   
@@ -143,29 +113,6 @@ const Insights = () => {
       return isSameMonth(moodDate, selectedMonth);
     });
   }, [moodHistory, selectedMonth]);
-
-  const emotionDistribution = useMemo(() => {
-    const counts: Record<string, number> = {};
-    monthMoods.forEach((mood) => {
-      counts[mood.mood] = (counts[mood.mood] || 0) + 1;
-    });
-    
-    const total = monthMoods.length || 1;
-    return Object.entries(counts)
-      .map(([mood, count]) => ({
-        mood,
-        count,
-        percentage: Math.round((count / total) * 100),
-        color: getMoodInfo(mood).color,
-        category: getMoodInfo(mood).category,
-      }))
-      .sort((a, b) => b.count - a.count);
-  }, [monthMoods]);
-
-  const dominatingMoods = useMemo(() => emotionDistribution.slice(0, 3), [emotionDistribution]);
-  const personality = useMemo(() => getPersonalityLabel(emotionDistribution), [emotionDistribution]);
-  const moodSummary = useMemo(() => getMoodSummary(emotionDistribution), [emotionDistribution]);
-  const stability = useMemo(() => getStabilityScore(monthMoods), [monthMoods]);
 
   const moodsByDay = useMemo(() => {
     const byDay: Record<string, MoodEntry[]> = {};
@@ -255,15 +202,11 @@ const Insights = () => {
           moodsByDay={moodsByDay}
         />
 
-        {/* Dominant Mood Summary */}
-        <DominantMoodSummary 
-          dominatingMoods={dominatingMoods}
-          personality={personality}
-          moodSummary={moodSummary}
-        />
+        {/* Reflective Card — dominant mood, descriptors, note snippet */}
+        <ReflectiveCard monthMoods={monthMoods} />
 
-        {/* Emotional Consistency Score */}
-        <EmotionalConsistency stability={stability} entryCount={monthMoods.length} />
+        {/* Emotional Consistency Score — SD-based + waveform */}
+        <EmotionalConsistency monthMoods={monthMoods} selectedMonth={selectedMonth} />
 
         {/* Influence Tracking (Factors → Mood) */}
         <InfluenceTracking 
@@ -276,61 +219,11 @@ const Insights = () => {
           calendarRef={calendarRef}
         />
 
-        {/* Trigger Summary + Patterns — consolidated when insufficient data */}
-        {triggerInsights.hasEnoughMoodData ? (
-          <>
-            <TriggerSummary
-              triggerImpacts={triggerInsights.triggerImpacts}
-              topPositive={triggerInsights.topPositive}
-              topNegative={triggerInsights.topNegative}
-              hasEnoughData={triggerInsights.hasEnoughTriggerData}
-              progressMessage={triggerInsights.progressMessage}
-              contextQuality={triggerInsights.contextQuality}
-              baselineDrift={triggerInsights.baselineDrift}
-              daysTracked={triggerInsights.daysTracked}
-              phaseDescription={triggerInsights.phaseDescription}
-            />
-            <TriggerPatterns
-              patterns={triggerInsights.patterns}
-              hasEnoughTriggerData={triggerInsights.hasEnoughTriggerData}
-              hasEnoughMoodData={triggerInsights.hasEnoughMoodData}
-              daysWithTriggerData={triggerInsights.daysWithTriggerData}
-              unattributedPatterns={triggerInsights.unattributedPatterns}
-              daysTracked={triggerInsights.daysTracked}
-              phaseDescription={triggerInsights.phaseDescription}
-            />
-          </>
-        ) : (
-          <Card className="bg-card/60 backdrop-blur-sm border-border/40">
-            <CardContent className="p-5">
-              <div className="flex items-start gap-3">
-                <div className="w-8 h-8 rounded-xl bg-green-500/10 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Sprout className="w-4 h-4 text-green-400" />
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-foreground font-semibold text-sm mb-1">Keep logging to see patterns</p>
-                  <p className="text-muted-foreground text-xs leading-relaxed mb-3">
-                    Trigger correlations, time-of-day moods and weekly patterns all need 7+ check-ins to surface accurately.
-                  </p>
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-accent" />
-                      <span className="text-muted-foreground text-xs">
-                        {triggerInsights.daysTracked}/7 days
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5">
-                      <div className="w-1.5 h-1.5 rounded-full bg-accent/60" />
-                      <span className="text-muted-foreground text-xs">
-                        {factors.length} factor{factors.length !== 1 ? "s" : ""} tracked
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {/* What Influenced Your Mood — trigger delta bars, self-gating */}
+        <WhatInfluencedYourMood monthMoods={monthMoods} />
+
+        {/* Patterns You Might Miss — time-of-day + weekday bars, self-gating */}
+        <PatternsYouMightMiss monthMoods={monthMoods} />
 
         {/* Pro-Only Preview Sections - Now with real data */}
         <ProPreview 

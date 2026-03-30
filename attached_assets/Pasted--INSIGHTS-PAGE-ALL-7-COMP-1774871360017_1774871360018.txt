@@ -1,0 +1,1075 @@
+/**
+ * ============================================================
+ *  INSIGHTS PAGE — ALL 7 COMPONENTS, FULLY ACCURATE
+ *
+ *  1.  MoodTimeline
+ *  2.  EmotionalBreakdown
+ *  3.  ReflectiveCard
+ *  4.  EmotionalConsistency
+ *  5.  InfluenceTracking
+ *  6.  WhatInfluencedYourMood
+ *  7.  PatternsYouMightMiss
+ *  8.  DeeperInsights (Pro)
+ *  9.  InsightsPage  ← the full assembled page
+ *
+ *  HOW TO USE IN REPLIT:
+ *  - Drop this file into src/components/InsightsComponents.jsx
+ *  - Import InsightsPage in your router/navigation
+ *  - Make sure moodTrackerCore.js is in src/ (from the previous file)
+ * ============================================================
+ */
+
+import React, { useMemo } from "react";
+import {
+  getAllEntries,
+  getAllFactors,
+  entriesForMonth,
+  toLocalDate,
+  fromLocalDate,
+  lastNDays,
+  MOOD_LEVELS,
+  DEFAULT_TRIGGERS,
+  timeOfDayBucket,
+  calculateStreak,
+  weekCheckins,
+  triggerInfluence,
+  consistencyScore,
+} from "./moodTrackerCore";
+
+// ─────────────────────────────────────────
+// SHARED STYLE TOKENS (dark navy theme)
+// ─────────────────────────────────────────
+const C = {
+  bg:       "#0a1628",
+  card:     "#0f2645",
+  border:   "#1e3a5f",
+  text:     "#e2e8f0",
+  muted:    "#6080a0",
+  faint:    "#3a5070",
+  blue:     "#2563eb",
+  blueText: "#60a5fa",
+  amber:    "#f59e0b",
+  red:      "#ef4444",
+  orange:   "#f97316",
+  purple:   "#a78bfa",
+  teal:     "#2dd4bf",
+  green:    "#22c55e",
+  emerald:  "#10b981",
+};
+
+const MOOD_CONFIG = {
+  1: { label: "Low",   color: C.red,     bg: "#3d1a1a", border: "#7f1d1d" },
+  2: { label: "Bad",   color: C.orange,  bg: "#2d1a0a", border: "#7c2d12" },
+  3: { label: "Okay",  color: C.purple,  bg: "#1a1a3d", border: "#3730a3" },
+  4: { label: "Good",  color: C.emerald, bg: "#0d2d20", border: "#065f46" },
+  5: { label: "Great", color: C.green,   bg: "#0d2d10", border: "#166534" },
+};
+
+// ─────────────────────────────────────────
+// HELPER: Card wrapper
+// ─────────────────────────────────────────
+function Card({ children, style }) {
+  return (
+    <div style={{
+      background: C.card,
+      border: `1px solid ${C.border}`,
+      borderRadius: 16,
+      padding: "16px",
+      marginBottom: 12,
+      ...style
+    }}>
+      {children}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
+// HELPER: Progress bar
+// ─────────────────────────────────────────
+function ProgressBar({ value, max, color = C.blue, height = 4 }) {
+  const pct = Math.min(100, Math.round((value / max) * 100));
+  return (
+    <div style={{ background: "#1a2d45", borderRadius: 99, height, overflow: "hidden" }}>
+      <div style={{ width: `${pct}%`, height: "100%", background: color, borderRadius: 99, transition: "width 0.4s" }} />
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────
+// HELPER: Gate message (shown when not enough data)
+// ─────────────────────────────────────────
+function GateMessage({ current, required, message, color = C.blue }) {
+  return (
+    <div style={{ textAlign: "center", padding: "12px 0 4px" }}>
+      <div style={{ fontSize: 13, color: C.muted, marginBottom: 6 }}>{message}</div>
+      <div style={{ fontSize: 11, color: C.faint, marginBottom: 10 }}>
+        {current} / {required} check-ins
+      </div>
+      <ProgressBar value={current} max={required} color={color} height={5} />
+    </div>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════
+// 1. MOOD TIMELINE
+//    Bar chart — one bar per day, height = mood level,
+//    colour = mood category, dim bar = no entry.
+// ══════════════════════════════════════════════════════
+export function MoodTimeline({ entries, year, month }) {
+  // Build a map: { "YYYY-MM-DD": avgMoodLevel }
+  const dailyMap = useMemo(() => {
+    const map = {};
+    entries.forEach(e => {
+      if (!map[e.date]) map[e.date] = [];
+      map[e.date].push(e.moodLevel);
+    });
+    const result = {};
+    Object.entries(map).forEach(([date, levels]) => {
+      result[date] = levels.reduce((s, v) => s + v, 0) / levels.length;
+    });
+    return result;
+  }, [entries]);
+
+  // Days in the selected month
+  const daysInMonth = new Date(year, month, 0).getDate();
+  const days = Array.from({ length: daysInMonth }, (_, i) => {
+    const d = String(i + 1).padStart(2, "0");
+    const m = String(month).padStart(2, "0");
+    return `${year}-${m}-${d}`;
+  });
+
+  const CHART_HEIGHT = 70;
+
+  if (entries.length < 3) {
+    return (
+      <Card>
+        <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 10 }}>
+          Mood Timeline — {new Date(year, month - 1).toLocaleString("default", { month: "long" })}
+        </div>
+        <GateMessage current={entries.length} required={3} message="Log 3 moods to see your timeline" />
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 12 }}>
+        Mood Timeline — {new Date(year, month - 1).toLocaleString("default", { month: "long" })}
+      </div>
+
+      {/* Bar chart */}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: CHART_HEIGHT }}>
+        {days.map(dateStr => {
+          const avg = dailyMap[dateStr];
+          const hasEntry = avg !== undefined;
+          const level = hasEntry ? Math.round(avg) : 0;
+          const heightPct = hasEntry ? (level / 5) * 100 : 10;
+          const color = hasEntry ? MOOD_CONFIG[level].color : "#1e2d45";
+          const dayNum = parseInt(dateStr.split("-")[2]);
+
+          return (
+            <div
+              key={dateStr}
+              title={hasEntry ? `${dayNum} — ${MOOD_CONFIG[level].label} (avg ${avg.toFixed(1)})` : `${dayNum} — no entry`}
+              style={{
+                flex: 1,
+                height: `${heightPct}%`,
+                background: color,
+                borderRadius: "2px 2px 0 0",
+                minHeight: 3,
+                opacity: hasEntry ? 1 : 0.4,
+                cursor: hasEntry ? "pointer" : "default",
+              }}
+            />
+          );
+        })}
+      </div>
+
+      {/* X-axis labels — show every 5th day */}
+      <div style={{ display: "flex", marginTop: 4 }}>
+        {days.map((dateStr, i) => {
+          const dayNum = parseInt(dateStr.split("-")[2]);
+          const show = dayNum === 1 || dayNum % 5 === 0;
+          return (
+            <div key={dateStr} style={{ flex: 1, fontSize: 8, color: C.faint, textAlign: "center" }}>
+              {show ? dayNum : ""}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Legend */}
+      <div style={{ display: "flex", gap: 12, marginTop: 10, flexWrap: "wrap" }}>
+        {[1, 3, 5].map(level => (
+          <span key={level} style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.faint }}>
+            <span style={{ width: 8, height: 8, borderRadius: "50%", background: MOOD_CONFIG[level].color, display: "inline-block" }} />
+            {MOOD_CONFIG[level].label}
+          </span>
+        ))}
+        <span style={{ display: "flex", alignItems: "center", gap: 4, fontSize: 10, color: C.faint }}>
+          <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#1e2d45", display: "inline-block" }} />
+          No entry
+        </span>
+      </div>
+    </Card>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════
+// 2. EMOTIONAL BREAKDOWN
+//    Always shows ALL 5 levels.
+//    Percentage = count / total * 100, rounded to integer.
+// ══════════════════════════════════════════════════════
+export function EmotionalBreakdown({ entries }) {
+  const breakdown = useMemo(() => {
+    const counts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    entries.forEach(e => { counts[e.moodLevel] = (counts[e.moodLevel] ?? 0) + 1; });
+    const total = entries.length || 1;
+    return Object.entries(counts).map(([level, count]) => ({
+      level: Number(level),
+      ...MOOD_CONFIG[Number(level)],
+      count,
+      pct: Math.round((count / total) * 100),
+    }));
+  }, [entries]);
+
+  if (entries.length < 3) {
+    return (
+      <Card>
+        <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 10 }}>Emotional Breakdown</div>
+        <GateMessage current={entries.length} required={3} message="Log 3 moods to see your breakdown" />
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 12 }}>Emotional Breakdown</div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+        {breakdown.map(({ level, label, color, count, pct }) => (
+          <div key={level}>
+            <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
+              <span style={{ fontSize: 13, color: count > 0 ? color : C.faint }}>{label}</span>
+              <span style={{ fontSize: 12, color: count > 0 ? color : C.faint }}>
+                {count} · {pct}%
+              </span>
+            </div>
+            <div style={{ height: 5, background: "#1a2d45", borderRadius: 99 }}>
+              <div style={{
+                height: "100%",
+                width: `${pct}%`,
+                background: color,
+                borderRadius: 99,
+                transition: "width 0.5s ease",
+                opacity: count > 0 ? 1 : 0.3,
+              }} />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div style={{ fontSize: 11, color: C.faint, marginTop: 10, fontStyle: "italic" }}>
+        Based on {entries.length} {entries.length === 1 ? "entry" : "entries"} this month
+      </div>
+    </Card>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════
+// 3. REFLECTIVE CARD
+//    Generated from REAL entry data — no hardcoded copy.
+//    Dominant mood, most used descriptor, note snippet.
+// ══════════════════════════════════════════════════════
+export function ReflectiveCard({ entries }) {
+  const reflection = useMemo(() => {
+    if (entries.length < 3) return null;
+
+    // Dominant mood = most frequent moodLevel
+    const counts = {};
+    entries.forEach(e => { counts[e.moodLevel] = (counts[e.moodLevel] ?? 0) + 1; });
+    const dominantLevel = Number(Object.entries(counts).sort((a, b) => b[1] - a[1])[0][0]);
+    const dominantPct = Math.round((counts[dominantLevel] / entries.length) * 100);
+
+    // Top descriptors (across all entries)
+    const descCounts = {};
+    entries.forEach(e => {
+      (e.descriptors ?? []).forEach(d => { descCounts[d] = (descCounts[d] ?? 0) + 1; });
+    });
+    const topDescriptors = Object.entries(descCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([d]) => d);
+
+    // Best and worst entry
+    const sorted = [...entries].sort((a, b) => b.moodLevel - a.moodLevel);
+    const best  = sorted[0];
+    const worst = sorted[sorted.length - 1];
+
+    // Note snippet (first non-empty note, max 6 words)
+    const noteSnippet = entries
+      .filter(e => e.note && e.note.trim().length > 0)
+      .map(e => e.note.trim().split(" ").slice(0, 6).join(" ") + (e.note.split(" ").length > 6 ? "…" : ""))
+      [0] ?? null;
+
+    // Generate tone based on dominant mood
+    const toneMap = {
+      1: { title: "Challenging Month",   body: `${dominantPct}% of your check-ins this month were Low. That takes courage to acknowledge.` },
+      2: { title: "Tough Stretch",       body: `Most of your entries this month landed in the Bad range. Noticing that is the first step.` },
+      3: { title: "Steady Month",        body: `You mostly felt Okay this month — balanced and moving through it.` },
+      4: { title: "Positive Month",      body: `${dominantPct}% of your check-ins were Good this month. Things seem to be flowing well.` },
+      5: { title: "Great Month",         body: `You were feeling Great for ${dominantPct}% of this month. Take note of what made that happen.` },
+    };
+
+    return {
+      tone: toneMap[dominantLevel],
+      dominantLevel,
+      dominantPct,
+      topDescriptors,
+      best,
+      worst,
+      noteSnippet,
+      allMoodLabels: Object.entries(counts)
+        .sort((a, b) => b[1] - a[1])
+        .map(([level, count]) => ({
+          level: Number(level),
+          label: MOOD_CONFIG[Number(level)].label,
+          color: MOOD_CONFIG[Number(level)].color,
+          pct: Math.round((count / entries.length) * 100),
+        })),
+    };
+  }, [entries]);
+
+  if (!reflection) {
+    return (
+      <Card>
+        <div style={{ fontSize: 13, color: C.faint, textAlign: "center", padding: "8px 0" }}>
+          Log 3 moods to get your personal reflection
+        </div>
+      </Card>
+    );
+  }
+
+  const { tone, noteSnippet, allMoodLabels, topDescriptors } = reflection;
+
+  return (
+    <Card>
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+        <div style={{ position: "relative", flexShrink: 0 }}>
+          <div style={{ fontSize: 28 }}>✦</div>
+          <div style={{
+            position: "absolute", bottom: -4, right: -4,
+            background: MOOD_CONFIG[reflection.dominantLevel].bg,
+            border: `1px solid ${MOOD_CONFIG[reflection.dominantLevel].border}`,
+            borderRadius: 99, fontSize: 9, color: MOOD_CONFIG[reflection.dominantLevel].color,
+            padding: "1px 5px", fontWeight: 700,
+          }}>
+            {reflection.dominantPct}%
+          </div>
+        </div>
+
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: C.text, marginBottom: 6 }}>
+            {tone.title}
+          </div>
+          <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.6, marginBottom: 8 }}>
+            {tone.body}
+          </div>
+
+          {/* Note snippet if exists */}
+          {noteSnippet && (
+            <div style={{
+              borderLeft: `2px solid ${C.blue}`,
+              paddingLeft: 8, marginBottom: 8,
+              fontSize: 11, color: C.blueText, fontStyle: "italic",
+            }}>
+              "{noteSnippet}"
+            </div>
+          )}
+
+          {/* Top descriptors if any */}
+          {topDescriptors.length > 0 && (
+            <div style={{ fontSize: 11, color: C.faint, marginBottom: 8 }}>
+              You described yourself as: {topDescriptors.join(", ")}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Mood label pills — actual data, not hardcoded */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+        {allMoodLabels
+          .filter(m => m.pct > 0)
+          .map(m => (
+            <span key={m.level} style={{
+              display: "flex", alignItems: "center", gap: 4,
+              background: MOOD_CONFIG[m.level].bg,
+              border: `1px solid ${MOOD_CONFIG[m.level].border}`,
+              borderRadius: 99, padding: "3px 10px",
+              fontSize: 11, color: m.color,
+            }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: m.color, display: "inline-block" }} />
+              {m.label} {m.pct}%
+            </span>
+          ))}
+      </div>
+    </Card>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════
+// 4. EMOTIONAL CONSISTENCY
+//    Real SD-based score. Locked under 7 entries.
+//    Waveform bars = actual daily mood values, not uniform.
+// ══════════════════════════════════════════════════════
+export function EmotionalConsistency({ entries, year, month }) {
+  const score = useMemo(() => {
+    if (entries.length < 7) return null;
+    const levels = entries.map(e => e.moodLevel);
+    const mean = levels.reduce((s, v) => s + v, 0) / levels.length;
+    const variance = levels.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / levels.length;
+    const sd = Math.sqrt(variance);
+    return Math.round(Math.max(0, Math.min(100, (1 - sd / 2.0) * 100)));
+  }, [entries]);
+
+  // Build daily averages for waveform
+  const dailyAvgs = useMemo(() => {
+    const map = {};
+    entries.forEach(e => {
+      if (!map[e.date]) map[e.date] = [];
+      map[e.date].push(e.moodLevel);
+    });
+    return lastNDays(30).map(date => {
+      const arr = map[date];
+      return arr ? arr.reduce((s, v) => s + v, 0) / arr.length : null;
+    });
+  }, [entries]);
+
+  const scoreLabel = score === null ? null :
+    score >= 80 ? { text: "Very stable",      color: C.green }  :
+    score >= 60 ? { text: "Fairly steady",     color: C.blue }   :
+    score >= 40 ? { text: "Some variation",    color: C.amber }  :
+                  { text: "High variability",  color: C.red };
+
+  const titleRow = (
+    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+      <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Emotional Consistency</div>
+      {score !== null
+        ? <span style={{ fontSize: 13, fontWeight: 700, color: scoreLabel.color,
+            background: "#1a2d45", borderRadius: 99, padding: "2px 10px" }}>{score}</span>
+        : <span style={{ fontSize: 11, color: C.faint,
+            background: "#1a2d45", borderRadius: 99, padding: "2px 10px" }}>{entries.length}/7 days</span>
+      }
+    </div>
+  );
+
+  if (score === null) {
+    return (
+      <Card>
+        {titleRow}
+        <GateMessage current={entries.length} required={7}
+          message="Score unlocks after 7 check-ins" />
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      {titleRow}
+
+      {/* Waveform — actual daily mood bars, not uniform height */}
+      <div style={{ display: "flex", alignItems: "flex-end", gap: 2, height: 40, marginBottom: 4 }}>
+        {dailyAvgs.map((avg, i) => (
+          <div key={i} style={{
+            flex: 1,
+            height: avg !== null ? `${(avg / 5) * 100}%` : "10%",
+            background: avg !== null ? C.blue : "#1e2d45",
+            borderRadius: "2px 2px 0 0",
+            opacity: avg !== null ? 0.9 : 0.3,
+            minHeight: 2,
+          }} />
+        ))}
+      </div>
+      <div style={{ height: 3, background: C.blue, borderRadius: 99, marginBottom: 10, opacity: 0.5 }} />
+
+      <div style={{ fontSize: 13, color: scoreLabel.color, fontWeight: 600, marginBottom: 3 }}>
+        {scoreLabel.text}
+      </div>
+      <div style={{ fontSize: 12, color: C.muted }}>
+        Your mood {score >= 60 ? "stays relatively consistent" : "shifts notably"} day to day.
+      </div>
+      <div style={{ fontSize: 11, color: C.faint, marginTop: 4 }}>
+        Higher consistency means fewer sudden mood shifts throughout the month.
+      </div>
+    </Card>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════
+// 5. INFLUENCE TRACKING
+//    Week strip, factor rows with accurate counts.
+//    Sentiment labels only after 3+ uses with mood data.
+// ══════════════════════════════════════════════════════
+export function InfluenceTracking({ entries }) {
+  const today = toLocalDate();
+  const week  = weekCheckins(); // last 7 days
+
+  const factors = getAllFactors();
+
+  // For each factor: compute sentiment label if earned
+  const factorRows = useMemo(() => {
+    return factors.map(factor => {
+      const todayCount = factor.history[today] ?? 0;
+
+      // Days where this factor was logged AND a mood entry exists
+      const withMood = Object.entries(factor.history)
+        .filter(([date, count]) => count > 0)
+        .map(([date]) => {
+          const dayEntries = entries.filter(e => e.date === date);
+          if (dayEntries.length === 0) return null;
+          const avg = dayEntries.reduce((s, e) => s + e.moodLevel, 0) / dayEntries.length;
+          return avg;
+        })
+        .filter(v => v !== null);
+
+      // Days without this factor that have mood entries
+      const withoutDates = [...new Set(entries.map(e => e.date))]
+        .filter(date => !(factor.history[date] > 0));
+      const withoutMood = withoutDates.map(date => {
+        const dayEntries = entries.filter(e => e.date === date);
+        return dayEntries.reduce((s, e) => s + e.moodLevel, 0) / dayEntries.length;
+      });
+
+      let sentimentLabel = null;
+      if (withMood.length >= 3 && withoutMood.length >= 3) {
+        const avgWith    = withMood.reduce((s, v) => s + v, 0) / withMood.length;
+        const avgWithout = withoutMood.reduce((s, v) => s + v, 0) / withoutMood.length;
+        const delta = avgWith - avgWithout;
+
+        if (delta >= 0.5)       sentimentLabel = { text: "Often lifting",     color: C.green };
+        else if (delta >= 0.3)  sentimentLabel = { text: "Slightly lifting",  color: C.teal };
+        else if (delta <= -0.5) sentimentLabel = { text: "Often draining",    color: C.red };
+        else if (delta <= -0.3) sentimentLabel = { text: "Slightly draining", color: C.orange };
+        // else: no label — not enough evidence
+      }
+
+      return { ...factor, todayCount, sentimentLabel, trackedDays: withMood.length };
+    });
+  }, [factors, entries, today]);
+
+  return (
+    <Card>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+        <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Influence Tracking</div>
+        <span style={{ fontSize: 11, color: C.blue }}>Today</span>
+      </div>
+
+      {/* Week day strip */}
+      <div style={{ display: "flex", gap: 4, marginBottom: 14 }}>
+        {week.map(({ date, hasEntry, isToday }) => {
+          const dayName = fromLocalDate(date)
+            .toLocaleDateString("en-ZA", { weekday: "short" }).slice(0, 2);
+          const dayNum = parseInt(date.split("-")[2]);
+          return (
+            <div key={date} style={{ flex: 1, textAlign: "center" }}>
+              <div style={{ fontSize: 9, color: isToday ? C.blueText : C.faint, marginBottom: 2 }}>
+                {dayName}
+              </div>
+              <div style={{
+                fontSize: 11, fontWeight: isToday ? 700 : 400,
+                color: isToday ? C.blueText : C.muted,
+                background: isToday ? "#1a3a6b" : "transparent",
+                borderRadius: isToday ? 99 : 0,
+                padding: "3px 0",
+              }}>
+                {dayNum}
+              </div>
+              {/* Dot = entry exists that day */}
+              <div style={{
+                width: 4, height: 4, borderRadius: "50%", margin: "2px auto 0",
+                background: hasEntry ? C.blue : "transparent",
+              }} />
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Factor rows */}
+      <div style={{ borderTop: `1px solid #111e30` }}>
+        {factorRows.map(factor => (
+          <div key={factor.id} style={{
+            display: "flex", alignItems: "center",
+            padding: "10px 0",
+            borderBottom: `1px solid #111e30`,
+          }}>
+            <span style={{ fontSize: 16, marginRight: 10 }}>{factor.icon}</span>
+            <div style={{ flex: 1 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                <span style={{ fontSize: 13, color: C.muted }}>{factor.name}</span>
+                {/* Only show label when earned */}
+                {factor.sentimentLabel && (
+                  <span style={{
+                    fontSize: 10, color: factor.sentimentLabel.color,
+                    fontWeight: 600,
+                  }}>
+                    · {factor.sentimentLabel.text}
+                  </span>
+                )}
+              </div>
+              {/* Gate message if not enough data yet */}
+              {!factor.sentimentLabel && factor.trackedDays > 0 && factor.trackedDays < 3 && (
+                <div style={{ fontSize: 10, color: C.faint, marginTop: 2 }}>
+                  {factor.trackedDays}/3 uses needed to show impact
+                </div>
+              )}
+            </div>
+            {/* Dot-scale for today's count (max 5 dots) */}
+            <div style={{ display: "flex", gap: 3, marginRight: 8 }}>
+              {Array.from({ length: 5 }, (_, i) => (
+                <div key={i} style={{
+                  width: 6, height: 6, borderRadius: "50%",
+                  background: i < factor.todayCount ? C.blue : "#1e2d45",
+                }} />
+              ))}
+            </div>
+            <span style={{ fontSize: 13, color: factor.todayCount > 0 ? C.blueText : C.faint, minWidth: 16, textAlign: "right" }}>
+              {factor.todayCount}
+            </span>
+          </div>
+        ))}
+      </div>
+
+      {factorRows.every(f => !f.sentimentLabel) && (
+        <div style={{ fontSize: 11, color: C.faint, marginTop: 8, fontStyle: "italic" }}>
+          Sentiment labels appear after logging a factor 3+ times with mood data
+        </div>
+      )}
+    </Card>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════
+// 6. WHAT INFLUENCED YOUR MOOD
+//    Real trigger correlation — avgMood per trigger,
+//    ranked from most positive to most negative.
+// ══════════════════════════════════════════════════════
+export function WhatInfluencedYourMood({ entries }) {
+  const triggerData = useMemo(() => triggerInfluence(entries), [entries]);
+
+  // Get all triggers that have been used at least once
+  const usedTriggers = triggerData.filter(t => t.count > 0);
+
+  const allTriggers = [...DEFAULT_TRIGGERS];
+
+  if (entries.length < 3 || usedTriggers.length === 0) {
+    return (
+      <Card>
+        <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 10 }}>
+          What Influenced Your Mood
+        </div>
+        <div style={{
+          background: "#080f1e", border: `1px solid ${C.border}`,
+          borderRadius: 12, padding: "14px", textAlign: "center",
+        }}>
+          <div style={{ fontSize: 13, color: C.faint, lineHeight: 1.6 }}>
+            Add triggers to your check-ins to discover what impacts your mood.
+          </div>
+          <div style={{ fontSize: 11, color: "#2a3d50", marginTop: 6 }}>
+            When you've used a trigger 3+ times with mood data, patterns will appear here.
+          </div>
+        </div>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 12 }}>
+        What Influenced Your Mood
+      </div>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        {usedTriggers.map(trigger => {
+          const delta = trigger.avgMood - 3; // 3 = Okay baseline
+          const barColor =
+            delta >= 0.5 ? C.green :
+            delta >= 0.1 ? C.teal :
+            delta <= -0.5 ? C.red :
+            delta <= -0.1 ? C.orange : C.muted;
+
+          const barWidth = Math.abs(delta) / 2 * 100; // max delta = 2 on 1-5 scale
+          const isPositive = delta >= 0;
+
+          const meta = allTriggers.find(t => t.id === trigger.id) ?? { icon: "•" };
+
+          return (
+            <div key={trigger.id} style={{
+              background: "#080f1e", borderRadius: 10,
+              border: `1px solid ${C.border}`, padding: "10px 12px",
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                  <span style={{ fontSize: 14 }}>{meta.icon}</span>
+                  <span style={{ fontSize: 13, color: C.muted }}>{trigger.label}</span>
+                  <span style={{ fontSize: 10, color: C.faint }}>({trigger.count}x)</span>
+                </div>
+                <span style={{ fontSize: 12, color: barColor, fontWeight: 600 }}>
+                  avg {trigger.avgMood.toFixed(1)} / 5
+                </span>
+              </div>
+
+              {/* Delta bar centred at Okay (3) */}
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <span style={{ fontSize: 9, color: C.faint, width: 22, textAlign: "right" }}>Low</span>
+                <div style={{ flex: 1, height: 4, background: "#1a2d45", borderRadius: 99, position: "relative" }}>
+                  {/* Center line */}
+                  <div style={{ position: "absolute", left: "50%", top: 0, width: 1, height: "100%", background: "#2a3d55" }} />
+                  {/* Delta bar */}
+                  <div style={{
+                    position: "absolute",
+                    left: isPositive ? "50%" : `${50 - barWidth}%`,
+                    width: `${barWidth}%`,
+                    height: "100%",
+                    background: barColor,
+                    borderRadius: 99,
+                    minWidth: 2,
+                  }} />
+                </div>
+                <span style={{ fontSize: 9, color: C.faint, width: 22 }}>Great</span>
+              </div>
+
+              {/* Confidence label */}
+              {trigger.count < 5 && (
+                <div style={{ fontSize: 10, color: "#2a3d50", marginTop: 4 }}>
+                  Low confidence — log more entries with this trigger
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ fontSize: 10, color: C.faint, marginTop: 10, fontStyle: "italic" }}>
+        Correlations, not causes. Many factors affect your mood.
+      </div>
+    </Card>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════
+// 7. PATTERNS YOU MIGHT MISS
+//    Time-of-day breakdown + weekday breakdown.
+//    Each pattern needs minimum data to show.
+// ══════════════════════════════════════════════════════
+export function PatternsYouMightMiss({ entries }) {
+  // Time of day breakdown
+  const timeOfDay = useMemo(() => {
+    const buckets = { Morning: [], Afternoon: [], Evening: [], Night: [] };
+    entries.forEach(e => {
+      const b = timeOfDayBucket(e.hour);
+      buckets[b].push(e.moodLevel);
+    });
+    return Object.entries(buckets)
+      .map(([label, levels]) => ({
+        label,
+        count: levels.length,
+        avg: levels.length >= 3
+          ? parseFloat((levels.reduce((s, v) => s + v, 0) / levels.length).toFixed(1))
+          : null,
+      }))
+      .filter(b => b.count > 0);
+  }, [entries]);
+
+  // Weekday breakdown
+  const weekdays = useMemo(() => {
+    const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const buckets = Object.fromEntries(days.map(d => [d, []]));
+    entries.forEach(e => {
+      const d = fromLocalDate(e.date).getDay();
+      buckets[days[d]].push(e.moodLevel);
+    });
+    return days.map(day => ({
+      day,
+      count:  buckets[day].length,
+      avg:    buckets[day].length >= 2
+        ? parseFloat((buckets[day].reduce((s, v) => s + v, 0) / buckets[day].length).toFixed(1))
+        : null,
+    }));
+  }, [entries]);
+
+  if (entries.length < 7) {
+    return (
+      <Card>
+        <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 10 }}>
+          Patterns You Might Miss
+        </div>
+        <GateMessage current={entries.length} required={7} message="Patterns unlock after 7 check-ins" />
+      </Card>
+    );
+  }
+
+  const bestTimeOfDay  = timeOfDay.filter(b => b.avg !== null).sort((a, b) => b.avg - a.avg)[0];
+  const bestWeekday    = weekdays.filter(d => d.avg !== null).sort((a, b) => b.avg - a.avg)[0];
+  const worstWeekday   = weekdays.filter(d => d.avg !== null).sort((a, b) => a.avg - b.avg)[0];
+
+  return (
+    <Card>
+      <div style={{ fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 12 }}>
+        Patterns You Might Miss
+      </div>
+
+      {/* Time-of-day bars */}
+      {timeOfDay.length > 0 && (
+        <div style={{ marginBottom: 14 }}>
+          <div style={{ fontSize: 11, color: C.faint, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>
+            Time of day
+          </div>
+          <div style={{ display: "flex", gap: 8 }}>
+            {timeOfDay.map(({ label, count, avg }) => (
+              <div key={label} style={{ flex: 1, textAlign: "center" }}>
+                <div style={{
+                  height: 40, background: "#1a2d45", borderRadius: 4,
+                  display: "flex", alignItems: "flex-end", overflow: "hidden",
+                }}>
+                  {avg !== null && (
+                    <div style={{
+                      width: "100%",
+                      height: `${(avg / 5) * 100}%`,
+                      background: label === bestTimeOfDay?.label ? C.blue : "#2a4070",
+                      borderRadius: "2px 2px 0 0",
+                    }} />
+                  )}
+                </div>
+                <div style={{ fontSize: 10, color: C.faint, marginTop: 4 }}>{label.slice(0, 3)}</div>
+                {avg !== null && (
+                  <div style={{ fontSize: 10, color: C.muted }}>{avg}</div>
+                )}
+                {avg === null && (
+                  <div style={{ fontSize: 9, color: "#2a3d50" }}>({count})</div>
+                )}
+              </div>
+            ))}
+          </div>
+          {bestTimeOfDay && (
+            <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>
+              You tend to feel best in the <span style={{ color: C.blueText }}>{bestTimeOfDay.label}</span> (avg {bestTimeOfDay.avg})
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Weekday bars */}
+      <div>
+        <div style={{ fontSize: 11, color: C.faint, marginBottom: 8, textTransform: "uppercase", letterSpacing: 1 }}>
+          Day of week
+        </div>
+        <div style={{ display: "flex", gap: 4 }}>
+          {weekdays.map(({ day, count, avg }) => (
+            <div key={day} style={{ flex: 1, textAlign: "center" }}>
+              <div style={{
+                height: 32, background: "#1a2d45", borderRadius: 3,
+                display: "flex", alignItems: "flex-end", overflow: "hidden",
+              }}>
+                {avg !== null && (
+                  <div style={{
+                    width: "100%",
+                    height: `${(avg / 5) * 100}%`,
+                    background: day === bestWeekday?.day ? C.green :
+                                day === worstWeekday?.day ? C.red : "#2a4070",
+                    borderRadius: "2px 2px 0 0",
+                  }} />
+                )}
+              </div>
+              <div style={{ fontSize: 9, color: avg !== null ? C.faint : "#1e2d45", marginTop: 3 }}>{day}</div>
+            </div>
+          ))}
+        </div>
+        {bestWeekday && worstWeekday && bestWeekday.day !== worstWeekday.day && (
+          <div style={{ fontSize: 11, color: C.muted, marginTop: 8 }}>
+            Best day: <span style={{ color: C.green }}>{bestWeekday.day}</span> · Toughest: <span style={{ color: C.red }}>{worstWeekday.day}</span>
+          </div>
+        )}
+      </div>
+    </Card>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════
+// 8. DEEPER INSIGHTS (PRO)
+//    Shows compact locked cards until user has Pro + data.
+//    When unlocked: shows full content with real calculations.
+// ══════════════════════════════════════════════════════
+export function DeeperInsights({ entries, isPro = false }) {
+  const features = [
+    {
+      id: "triggerPatterns",
+      icon: "↗",
+      title: "Trigger Patterns",
+      desc: "What actually changes your mood",
+      required: 10,
+      color: C.blue,
+    },
+    {
+      id: "aiReflections",
+      icon: "✦",
+      title: "AI Reflections",
+      desc: "Personalised weekly observations",
+      required: 7,
+      color: C.purple,
+    },
+    {
+      id: "longTermTrends",
+      icon: "~",
+      title: "Long-term Trends",
+      desc: "Track progress over months",
+      required: 60, // ~2 months
+      color: C.teal,
+    },
+    {
+      id: "forecasting",
+      icon: "◈",
+      title: "Emotional Forecasting",
+      desc: "Predict upcoming mood dips",
+      required: 21,
+      color: C.amber,
+    },
+  ];
+
+  return (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{
+        display: "flex", justifyContent: "space-between", alignItems: "center",
+        padding: "0 0 8px",
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 14, fontWeight: 600, color: C.text }}>
+          ✦ Deeper Insights
+        </div>
+        {!isPro && (
+          <span style={{
+            fontSize: 10, color: C.amber, fontWeight: 600,
+            background: "#2a1f08", border: `1px solid #92400e`,
+            borderRadius: 99, padding: "3px 10px",
+          }}>
+            🔒 View Pro
+          </span>
+        )}
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+        {features.map(feature => {
+          const isUnlocked = isPro && entries.length >= feature.required;
+          const progress   = Math.min(entries.length / feature.required, 1);
+
+          return (
+            <div key={feature.id} style={{
+              background: C.card,
+              border: `1px solid ${isUnlocked ? feature.color + "44" : C.border}`,
+              borderRadius: 12, padding: 12,
+              opacity: isUnlocked ? 1 : 0.85,
+            }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+                <span style={{ fontSize: 16, color: isUnlocked ? feature.color : C.faint }}>
+                  {feature.icon}
+                </span>
+                {!isUnlocked && (
+                  <span style={{ fontSize: 12, color: C.faint }}>🔒</span>
+                )}
+              </div>
+              <div style={{ fontSize: 12, fontWeight: 600, color: isUnlocked ? C.text : C.muted, marginBottom: 3 }}>
+                {feature.title}
+              </div>
+              <div style={{ fontSize: 10, color: C.faint, marginBottom: isUnlocked ? 0 : 8 }}>
+                {feature.desc}
+              </div>
+              {!isUnlocked && (
+                <>
+                  <ProgressBar value={entries.length} max={feature.required} color={feature.color} height={3} />
+                  <div style={{ fontSize: 9, color: "#2a3d50", marginTop: 4, textAlign: "right" }}>
+                    {entries.length}/{feature.required} entries
+                  </div>
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+
+// ══════════════════════════════════════════════════════
+// 9. ASSEMBLED INSIGHTS PAGE
+//    Drop this into your navigation as the Insights tab.
+// ══════════════════════════════════════════════════════
+export default function InsightsPage({ isPro = false }) {
+  const now   = new Date();
+  const year  = now.getFullYear();
+  const month = now.getMonth() + 1;
+
+  const monthEntries = useMemo(() => entriesForMonth(year, month), [year, month]);
+
+  const totalNeeded = 7;
+  const daysRemaining = Math.max(0, totalNeeded - monthEntries.length);
+
+  return (
+    <div style={{ background: C.bg, minHeight: "100vh", paddingBottom: 80 }}>
+      {/* Header */}
+      <div style={{ padding: "20px 16px 8px" }}>
+        <div style={{ fontSize: 11, color: C.faint, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>
+          Your Insights
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ fontSize: 24, fontWeight: 700, color: C.text }}>
+              {now.toLocaleString("default", { month: "long" })}
+            </span>
+            <span style={{ color: C.faint }}>▾</span>
+          </div>
+          <button style={{
+            width: 36, height: 36, borderRadius: "50%",
+            background: "#0f2645", border: `1px solid ${C.border}`,
+            color: C.faint, fontSize: 14, cursor: "pointer",
+          }}>↓</button>
+        </div>
+      </div>
+
+      <div style={{ padding: "0 12px" }}>
+        {/* Progress hint — only when < 7 entries */}
+        {daysRemaining > 0 && (
+          <div style={{
+            background: "#0f2645", border: `1px solid ${C.border}`,
+            borderLeft: `3px solid ${C.amber}`, borderRadius: "0 12px 12px 0",
+            padding: "10px 14px", marginBottom: 12,
+            display: "flex", alignItems: "center", gap: 10,
+          }}>
+            <span style={{ color: C.amber, fontSize: 14 }}>+</span>
+            <div>
+              <div style={{ fontSize: 12, color: "#fbbf24", fontWeight: 600 }}>
+                {daysRemaining} more {daysRemaining === 1 ? "day" : "days"} needed
+              </div>
+              <div style={{ fontSize: 11, color: C.faint }}>
+                Keep logging with context — patterns become clearer over time.
+              </div>
+            </div>
+          </div>
+        )}
+
+        <MoodTimeline entries={monthEntries} year={year} month={month} />
+        <EmotionalBreakdown entries={monthEntries} />
+        <ReflectiveCard entries={monthEntries} />
+        <EmotionalConsistency entries={monthEntries} year={year} month={month} />
+        <InfluenceTracking entries={monthEntries} />
+        <WhatInfluencedYourMood entries={monthEntries} />
+        <PatternsYouMightMiss entries={monthEntries} />
+        <DeeperInsights entries={monthEntries} isPro={isPro} />
+      </div>
+    </div>
+  );
+}
