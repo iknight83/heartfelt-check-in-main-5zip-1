@@ -52,5 +52,10 @@
         </dict>
         <key>ITSAppUsesNonExemptEncryption</key>
         <false/>
+        <key>WKWebViewConfiguration</key>
+        <dict>
+                <key>allowsInlineMediaPlayback</key>
+                <true/>
+        </dict>
 </dict>
 </plist>
