@@ -15,6 +15,8 @@ workflows:
         script: |
           cd heartfelt-check-in-main
           npm install
+          # Explicitly install Capacitor iOS native package
+          npm install @capacitor/ios@^8.3.0 @capacitor/cli@^8.3.0 --save-dev
 
       - name: Build web app
         script: |
@@ -28,8 +30,7 @@ workflows:
           # Fix Podfile deployment target
           sed -i '' "s/platform :ios, .*/platform :ios, '16.0'/" ios/App/Podfile
 
-          # Fix Podfile node_modules path to point directly to heartfelt-check-in-main/node_modules
-          # instead of ../../../node_modules which assumes wrong directory structure
+          # Fix Podfile node_modules paths to use absolute path
           NODE_MODULES_PATH="$(pwd)/node_modules"
           sed -i '' "s|require_relative '../../../node_modules/@capacitor/ios/scripts/pods_helpers'|require_relative '${NODE_MODULES_PATH}/@capacitor/ios/scripts/pods_helpers'|" ios/App/Podfile
           sed -i '' "s|:path => '../../../node_modules/@capacitor/ios'|:path => '${NODE_MODULES_PATH}/@capacitor/ios'|g" ios/App/Podfile
