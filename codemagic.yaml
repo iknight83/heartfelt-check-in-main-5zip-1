@@ -9,7 +9,7 @@ workflows:
       ios_signing:
         distribution_type: app_store
         bundle_identifier: com.knightleeron.state
-      node: 20
+      node: 22
     scripts:
       - name: Install dependencies
         script: |
@@ -24,14 +24,14 @@ workflows:
       - name: Sync iOS
         script: |
           cd heartfelt-check-in-main
-          npm install @capacitor/cli @capacitor/core @capacitor/ios
-          npx cap copy ios
 
           # Fix Podfile deployment target BEFORE pod install
           sed -i '' "s/platform :ios, .*/platform :ios, '16.0'/" ios/App/Podfile
 
           # Symlink node_modules to repo root so Podfile path resolves correctly
           ln -sf "$(pwd)/node_modules" ../node_modules
+
+          npx cap copy ios
 
           cd ios/App
           pod install --repo-update
@@ -46,7 +46,6 @@ workflows:
 
       - name: Set build number
         script: |
-          # Use Codemagic build number to ensure unique build each time
           agvtool new-version -all $BUILD_NUMBER
         working_directory: heartfelt-check-in-main/ios/App
 
