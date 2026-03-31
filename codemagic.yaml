@@ -25,13 +25,17 @@ workflows:
         script: |
           cd heartfelt-check-in-main
 
-          # Fix Podfile deployment target BEFORE pod install
+          # Fix Podfile deployment target
           sed -i '' "s/platform :ios, .*/platform :ios, '16.0'/" ios/App/Podfile
 
-          # The Podfile uses ../../../node_modules which from ios/App/ = repo root
-          # Codemagic clones to /Users/builder/clone/
-          # so we need node_modules at /Users/builder/clone/node_modules
-          ln -sf "$(pwd)/node_modules" /Users/builder/clone/node_modules
+          # Fix Podfile node_modules path to point directly to heartfelt-check-in-main/node_modules
+          # instead of ../../../node_modules which assumes wrong directory structure
+          NODE_MODULES_PATH="$(pwd)/node_modules"
+          sed -i '' "s|require_relative '../../../node_modules/@capacitor/ios/scripts/pods_helpers'|require_relative '${NODE_MODULES_PATH}/@capacitor/ios/scripts/pods_helpers'|" ios/App/Podfile
+          sed -i '' "s|:path => '../../../node_modules/@capacitor/ios'|:path => '${NODE_MODULES_PATH}/@capacitor/ios'|g" ios/App/Podfile
+          sed -i '' "s|:path => '../../node_modules/@capacitor/ios'|:path => '${NODE_MODULES_PATH}/@capacitor/ios'|g" ios/App/Podfile
+          sed -i '' "s|:path => '../../../node_modules|:path => '${NODE_MODULES_PATH}|g" ios/App/Podfile
+          sed -i '' "s|:path => '../../node_modules|:path => '${NODE_MODULES_PATH}|g" ios/App/Podfile
 
           npx cap copy ios
 
