@@ -1,0 +1,64 @@
+My iOS mood tracking app (Capacitor + React) loads too slowly on launch. Please optimize it for the fastest possible startup time by doing all of the following:
+1. Add a native splash screen so there's no blank gap on launch
+bashnpm install @capacitor/splash-screen
+npx cap sync ios
+In capacitor.config.ts add:
+tsplugins: {
+  SplashScreen: {
+    launchShowDuration: 1500,
+    launchAutoHide: true,
+    backgroundColor: "#0a1628",
+    showSpinner: false,
+    androidSplashResourceName: "splash",
+    splashFullScreen: true,
+    splashImmersive: true,
+  }
+}
+2. Code-split the React bundle — in vite.config.ts add:
+tsbuild: {
+  rollupOptions: {
+    output: {
+      manualChunks: {
+        vendor: ['react', 'react-dom'],
+        charts: ['chart.js'],
+      }
+    }
+  },
+  chunkSizeWarningLimit: 600,
+}
+3. Lazy load heavy pages — in your router, replace direct imports with lazy ones:
+tsconst InsightsPage = React.lazy(() => import('./components/InsightsPage'));
+const JournalPage  = React.lazy(() => import('./components/JournalPage'));
+Wrap the router in:
+tsx<React.Suspense fallback={<div style={{background:'#0a1628',height:'100vh'}} />}>
+  ...routes...
+</React.Suspense>
+4. Preload fonts and critical assets — in index.html inside <head> add:
+html<link rel="preconnect" href="https://fonts.googleapis.com" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+5. Enable Vite build optimizations — in vite.config.ts:
+tsbuild: {
+  minify: 'terser',
+  terserOptions: {
+    compress: {
+      drop_console: true,
+      drop_debugger: true,
+    }
+  },
+  cssCodeSplit: true,
+}
+This removes all console.log statements from the production build which slow down iOS.
+6. Add iOS-specific WKWebView performance settings — in ios/App/App/Info.plist add:
+xml<key>WKWebViewConfiguration</key>
+<dict>
+  <key>allowsInlineMediaPlayback</key>
+  <true/>
+</dict>
+7. Preload localStorage data before first render — in src/main.tsx make sure the app reads from localStorage synchronously before mounting React, not inside a useEffect. Move any initial data loading to before ReactDOM.render().
+8. After all changes, run:
+bashnpm run build
+npx cap sync ios
+git add .
+git commit -m "Performance: faster launch, code splitting, splash screen"
+git push
+Tell me what the bundle size was before and after, and confirm all steps completed.
