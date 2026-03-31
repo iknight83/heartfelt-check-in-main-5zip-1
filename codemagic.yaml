@@ -15,28 +15,64 @@ workflows:
         script: |
           cd heartfelt-check-in-main
           npm install
+
       - name: Build web app
         script: |
           cd heartfelt-check-in-main
           npm run build
-      - name: Add and Sync iOS
+
+      - name: Sync iOS
         script: |
           cd heartfelt-check-in-main
-          if [ ! -d "ios" ]; then
-            npx cap add ios
-          fi
-          npx cap sync ios
+          npm install @capacitor/cli @capacitor/core @capacitor/ios
+          npx cap copy ios
+
+          # Fix Podfile deployment target BEFORE pod install
+          sed -i '' "s/platform :ios, .*/platform :ios, '16.0'/" ios/App/Podfile
+
+          # Symlink node_modules to repo root so Podfile path resolves correctly
+          ln -sf "$(pwd)/node_modules" ../node_modules
+
+          cd ios/App
+          pod install --repo-update
+
+      - name: Fix deployment target in Xcode project
+        script: |
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = 14.0/IPHONEOS_DEPLOYMENT_TARGET = 16.0/g' \
+            heartfelt-check-in-main/ios/App/App.xcodeproj/project.pbxproj
+
       - name: Set up code signing
         script: xcode-project use-profiles
+
+      - name: Set build number
+        script: |
+          # Use Codemagic build number to ensure unique build each time
+          agvtool new-version -all $BUILD_NUMBER
+        working_directory: heartfelt-check-in-main/ios/App
+
       - name: Build iOS
         script: |
-          xcode-build-and-archive \
+          xcodebuild \
             -workspace heartfelt-check-in-main/ios/App/App.xcworkspace \
             -scheme App \
-            -config Release
+            -configuration Release \
+            -destination "generic/platform=iOS" \
+            -archivePath build/App.xcarchive \
+            archive
+
+          xcodebuild \
+            -exportArchive \
+            -archivePath build/App.xcarchive \
+            -exportPath build/ios/ipa \
+            -exportOptionsPlist heartfelt-check-in-main/ios/App/ExportOptions.plist
+
     artifacts:
       - build/ios/ipa/*.ipa
+      - /tmp/xcodebuild_logs/*.log
+
     publishing:
       app_store_connect:
         auth: integration
         submit_to_testflight: true
+        beta_groups:
+          - App Store Connect Users
