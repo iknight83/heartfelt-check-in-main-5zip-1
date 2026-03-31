@@ -28,8 +28,10 @@ workflows:
           # Fix Podfile deployment target BEFORE pod install
           sed -i '' "s/platform :ios, .*/platform :ios, '16.0'/" ios/App/Podfile
 
-          # Symlink node_modules to repo root so Podfile path resolves correctly
-          ln -sf "$(pwd)/node_modules" ../node_modules
+          # The Podfile uses ../../../node_modules which from ios/App/ = repo root
+          # Codemagic clones to /Users/builder/clone/
+          # so we need node_modules at /Users/builder/clone/node_modules
+          ln -sf "$(pwd)/node_modules" /Users/builder/clone/node_modules
 
           npx cap copy ios
 
