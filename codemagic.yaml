@@ -104,7 +104,11 @@ workflows:
           echo "✅ Archive exists:"
           ls -la "$ARCHIVE_PATH" || (echo "❌ Archive not created!" && exit 1)
           echo "✅ Web assets in archive:"
-          find "$ARCHIVE_PATH" -name "index.html" 2>/dev/null || echo "⚠️ index.html NOT found — blank screen!"
+          find "$ARCHIVE_PATH" -name "index.html" 2>/dev/null || echo "⚠️ index.html NOT found!"
+          echo "✅ JS files in archive:"
+          find "$ARCHIVE_PATH" -path "*/public/assets/*.js" 2>/dev/null | head -5 || echo "⚠️ NO JS FILES IN ARCHIVE"
+          echo "✅ All public files:"
+          find "$ARCHIVE_PATH" -path "*/App.app/public*" -type f 2>/dev/null | head -20
           echo "✅ Icons in archive:"
           find "$ARCHIVE_PATH" -name "*.png" 2>/dev/null | grep -i icon | head -5
 
