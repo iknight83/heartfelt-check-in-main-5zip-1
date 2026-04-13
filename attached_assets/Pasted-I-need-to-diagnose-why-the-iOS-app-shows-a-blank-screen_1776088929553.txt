@@ -1,0 +1,53 @@
+I need to diagnose why the iOS app shows a blank screen and missing 
+icon in TestFlight. Earlier builds (2 and 3) worked correctly — the 
+issue was introduced by recent code changes.
+
+DO NOT change any business logic, auth, Supabase, RevenueCat, or 
+routing code.
+
+Step 1 — Check capacitor.config.ts:
+Print the full contents of capacitor.config.ts. 
+If there is ANY "server" block with a "url" or "hostname" pointing 
+to localhost or a dev URL like "http://localhost:5173", remove it 
+entirely. The config should have NO server block at all.
+
+Step 2 — Check index.html for Service Worker code:
+Print everything between the <script> tags in index.html.
+If the service worker registration code does NOT check for 
+Capacitor platform before registering, replace it with this exact code:
+
+<script>
+  if ('serviceWorker' in navigator) {
+    const isCapacitor = window.location.protocol === 'capacitor:' || 
+                        window.location.hostname === 'localhost' && 
+                        navigator.userAgent.includes('iPhone');
+    const isNative = window.Capacitor && window.Capacitor.isNative;
+    
+    if (isNative || isCapacitor) {
+      // Unregister any existing service workers on Capacitor
+      navigator.serviceWorker.getRegistrations().then(registrations => {
+        registrations.forEach(reg => reg.unregister());
+      });
+    } else {
+      // Only register SW on web/PWA
+      navigator.serviceWorker.register('/sw.js', { scope: '/' });
+    }
+  }
+</script>
+
+Step 3 — Check vite.config.ts:
+Print the full contents. Confirm that:
+- base is set to '/'  
+- There is no "outDir" set to anything other than 'dist'
+- There are no custom publicDir settings
+
+Step 4 — Check the App icon:
+List ALL files in: ios/App/App/Assets.xcassets/AppIcon.appiconset/
+Then print the full contents of Contents.json in that folder.
+
+Step 5 — Run a clean build and confirm:
+npm run build
+ls dist/
+ls ios/App/App/Assets.xcassets/AppIcon.appiconset/
+
+Report what you find at each step before making any changes.

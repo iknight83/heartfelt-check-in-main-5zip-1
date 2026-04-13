@@ -34,22 +34,20 @@
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <script>
-      // Never run a Service Worker inside Capacitor (iOS/Android native shell).
-      // A stale SW intercepts bundle requests and causes a blank white screen.
-      var isCapacitor = window.Capacitor !== undefined ||
-                        window.location.protocol === 'capacitor:' ||
-                        window.location.protocol === 'ionic:';
-
       if ('serviceWorker' in navigator) {
-        if (isCapacitor) {
-          // Unregister any SW that may have been registered by a previous build.
+        var isCapacitor = window.location.protocol === 'capacitor:' ||
+                          (window.location.hostname === 'localhost' &&
+                           navigator.userAgent.includes('iPhone'));
+        var isNative = window.Capacitor && window.Capacitor.isNative;
+
+        if (isNative || isCapacitor) {
+          // Unregister any existing service workers on Capacitor
           navigator.serviceWorker.getRegistrations().then(function(registrations) {
-            registrations.forEach(function(r) { r.unregister(); });
+            registrations.forEach(function(reg) { reg.unregister(); });
           });
         } else {
-          window.addEventListener('load', function() {
-            navigator.serviceWorker.register('/sw.js').catch(function() {});
-          });
+          // Only register SW on web/PWA
+          navigator.serviceWorker.register('/sw.js', { scope: '/' });
         }
       }
     </script>
