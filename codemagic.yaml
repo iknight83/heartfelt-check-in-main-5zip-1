@@ -131,3 +131,4 @@ workflows:
         key_id: $ASC_KEY_ID
         issuer_id: $ASC_KEY_ISSUER_ID
         submit_to_testflight: true
+        submit_to_app_store: false
