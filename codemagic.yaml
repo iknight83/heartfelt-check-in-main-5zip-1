@@ -84,6 +84,7 @@ workflows:
           grep "ASSETCATALOG_COMPILER_APPICON_NAME" ios/App/App.xcodeproj/project.pbxproj
 
       # ─── 5. Set up code signing ───────────────────────────────────────────
+      # use-profiles sets signing on the App target ONLY — not on Pods targets
       - name: Set up code signing
         script: |
           keychain initialize
@@ -93,8 +94,11 @@ workflows:
             --key-id "$ASC_KEY_ID" \
             --private-key "$ASC_PRIVATE_KEY" \
             --create
-          echo "✅ Provisioning profiles installed:"
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles found"
+          echo "✅ Profiles installed:"
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null
+          # Configure ONLY the App target with the profile (leaves Pods on Automatic)
+          xcode-project use-profiles \
+            --project "$APP_ROOT/ios/App/App.xcodeproj"
 
       # ─── 6. Set build number ──────────────────────────────────────────────
       - name: Set build number
@@ -104,14 +108,11 @@ workflows:
           echo "✅ Build number: $BUILD_NUMBER"
 
       # ─── 7. Build iOS archive ─────────────────────────────────────────────
+      # No manual signing flags — use-profiles already configured the project
       - name: Build iOS
         script: |
           set -e
           cd $APP_ROOT/ios/App
-
-          echo "✅ Archive will be saved to: $ARCHIVE_PATH"
-          echo "✅ Available schemes:"
-          xcodebuild -workspace App.xcworkspace -list 2>&1
 
           xcodebuild \
             -workspace App.xcworkspace \
@@ -120,20 +121,17 @@ workflows:
             -destination "generic/platform=iOS" \
             -archivePath "$ARCHIVE_PATH" \
             DEVELOPMENT_TEAM=83U7FNH93D \
-            CODE_SIGN_STYLE=Manual \
-            CODE_SIGN_IDENTITY="Apple Distribution" \
-            PROVISIONING_PROFILE_SPECIFIER="STATE App Store" \
             ONLY_ACTIVE_ARCH=NO \
             clean archive 2>&1
 
-          echo "✅ Verifying archive exists:"
+          echo "✅ Verifying archive:"
           ls -la "$ARCHIVE_PATH" || (echo "❌ Archive not created!" && exit 1)
 
-          echo "✅ Confirming web assets in archive:"
+          echo "✅ Web assets in archive:"
           find "$ARCHIVE_PATH" -name "index.html" 2>/dev/null || \
-            echo "⚠️ index.html NOT found in archive — blank screen will occur"
+            echo "⚠️ index.html NOT found — blank screen will occur"
 
-          echo "✅ Confirming icons in archive:"
+          echo "✅ Icons in archive:"
           find "$ARCHIVE_PATH" -name "*.png" 2>/dev/null | grep -i icon | head -5
 
       # ─── 8. Export IPA ────────────────────────────────────────────────────
@@ -141,9 +139,6 @@ workflows:
         script: |
           set -e
           PLIST_PATH="$CM_BUILD_DIR/$APP_ROOT/ios/App/ExportOptions.plist"
-
-          echo "✅ Archive path: $ARCHIVE_PATH"
-          echo "✅ Plist path: $PLIST_PATH"
 
           ls -la "$ARCHIVE_PATH" || (echo "❌ Archive not found!" && exit 1)
           ls -la "$PLIST_PATH" || (echo "❌ ExportOptions.plist not found!" && exit 1)
