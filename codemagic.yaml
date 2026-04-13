@@ -1,163 +1,74 @@
-workflows:
-  ios-distribution:
-    name: STATE iOS Distribution
-    max_build_duration: 60
-    instance_type: mac_mini_m2
+#!/usr/bin/env bash
 
-    environment:
-      node: 22.0.0
-      xcode: latest
-      cocoapods: default
-      groups:
-        - app_store_credentials
-        - ios_signing
-      vars:
-        APP_ROOT: heartfelt-check-in-main
-        ARCHIVE_PATH: /tmp/App.xcarchive
-        EXPORT_PATH: /tmp/ipa-export
+set -e
+cd $APP_ROOT/ios/App
 
-    scripts:
+xcodebuild \
+  -workspace App.xcworkspace \
+  -scheme App \
+  -configuration Release \
+  -destination "generic/platform=iOS" \
+  -archivePath "$ARCHIVE_PATH" \
+  DEVELOPMENT_TEAM=83U7FNH93D \
+  ONLY_ACTIVE_ARCH=NO \
+  clean archive 2>&1
 
-      # ─── 1. Install JS dependencies ───────────────────────────────────────
-      - name: Install dependencies
-        script: |
-          cd $APP_ROOT
-          npm install
-          npm install @capacitor/cli@^8.1.0 @capacitor/core@^8.1.0 @capacitor/ios@^8.1.0
-          echo "✅ @capacitor/ios installed:"
-          ls node_modules/@capacitor/ios/scripts/pods_helpers.rb
+echo "✅ Verifying archive:"
+ls -la "$ARCHIVE_PATH" || (echo "❌ Archive not created!" && exit 1)
 
-      # ─── 2. Build web assets ──────────────────────────────────────────────
-      - name: Build web app
-        script: |
-          cd $APP_ROOT
-          npm run build
-          echo "✅ dist/ contents:"
-          ls -la dist/
-          test -f dist/index.html || (echo "❌ FATAL: dist/index.html missing" && exit 1)
+echo "✅ Web assets in archive:"
+find "$ARCHIVE_PATH" -name "index.html" 2>/dev/null || \
+  echo "⚠️ index.html NOT found — blank screen will occur"
 
-      # ─── 3. Sync iOS ──────────────────────────────────────────────────────
-      - name: Sync iOS
-        script: |
-          cd $APP_ROOT
+echo "✅ Icons in archive:"
+find "$ARCHIVE_PATH" -name "*.png" 2>/dev/null | grep -i icon | head -5
+Showing the last 50 lines. Click this button to load the full log
+        ➜ Explicit dependency on target 'RevenueCat-RevenueCat' in project 'Pods'
+    Target 'RevenueCat-RevenueCat' in project 'Pods' (no dependencies)
+    Target 'CapacitorSplashScreen' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor' in project 'Pods'
+    Target 'Capacitor' in project 'Pods'
+        ➜ Explicit dependency on target 'Capacitor-Capacitor' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorCordova' in project 'Pods'
+    Target 'Capacitor-Capacitor' in project 'Pods'
+        ➜ Implicit dependency on target 'CapacitorCordova' in project 'Pods' via options '-framework Cordova' in build setting 'OTHER_LDFLAGS'
+    Target 'CapacitorCordova' in project 'Pods'
+        ➜ Explicit dependency on target 'CapacitorCordova-CapacitorCordova' in project 'Pods'
+    Target 'CapacitorCordova-CapacitorCordova' in project 'Pods' (no dependencies)
 
-          NM="$(pwd)/node_modules"
-          PODFILE="ios/App/Podfile"
+GatherProvisioningInputs
 
-          sed -i '' \
-            "s|require_relative '\.\./\.\./\.\./node_modules|require_relative '${NM}|g; \
-             s|require_relative '\.\./\.\./node_modules|require_relative '${NM}|g; \
-             s|:path => '\.\./\.\./\.\./node_modules|:path => '${NM}|g; \
-             s|:path => '\.\./\.\./node_modules|:path => '${NM}|g" \
-            "$PODFILE"
+CreateBuildDescription
 
-          sed -i '' "s/platform :ios, '[0-9.]*'/platform :ios, '16.0'/" "$PODFILE"
+ExecuteExternalTool /Applications/Xcode-26.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -arch arm64 -isysroot /Applications/Xcode-26.2.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -x c -c /dev/null
 
-          echo "✅ Podfile head:"
-          head -5 "$PODFILE"
+ExecuteExternalTool /Applications/Xcode-26.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -isysroot /Applications/Xcode-26.2.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -x c -c /dev/null
 
-          npx cap copy ios
+ExecuteExternalTool /Applications/Xcode-26.2.app/Contents/Developer/usr/bin/ibtool --version --output-format xml1
 
-          echo "✅ iOS public folder:"
-          ls -la ios/App/App/public/
-          test -f ios/App/App/public/index.html || \
-            (echo "❌ FATAL: index.html missing after cap copy" && exit 1)
+ExecuteExternalTool /Applications/Xcode-26.2.app/Contents/Developer/usr/bin/actool --print-asset-tag-combinations --output-format xml1 /Users/builder/clone/heartfelt-check-in-main/ios/App/App/Assets.xcassets
 
-          cd ios/App
-          pod install --repo-update
-          echo "✅ Pod install complete"
+ExecuteExternalTool /Applications/Xcode-26.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/clang -v -E -dM -arch arm64 -isysroot /Applications/Xcode-26.2.app/Contents/Developer/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS26.2.sdk -x objective-c -c /dev/null
 
-      # ─── 4. Fix deployment target in Xcode project ────────────────────────
-      - name: Fix deployment target in Xcode project
-        script: |
-          cd $APP_ROOT
-          sed -i '' \
-            's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 16.0;/g' \
-            ios/App/App.xcodeproj/project.pbxproj
-          sed -i '' \
-            's/ASSETCATALOG_COMPILER_APPICON_NAME = [^;]*;/ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;/g' \
-            ios/App/App.xcodeproj/project.pbxproj
+ExecuteExternalTool /Applications/Xcode-26.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/swiftc --version
 
-          echo "✅ Deployment targets:"
-          grep "IPHONEOS_DEPLOYMENT_TARGET" ios/App/App.xcodeproj/project.pbxproj | head -4
-          echo "✅ AppIcon:"
-          grep "ASSETCATALOG_COMPILER_APPICON_NAME" ios/App/App.xcodeproj/project.pbxproj
+ExecuteExternalTool /Applications/Xcode-26.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/libtool -V
 
-      # ─── 5. Set up code signing ───────────────────────────────────────────
-      # use-profiles sets signing on the App target ONLY — not on Pods targets
-      - name: Set up code signing
-        script: |
-          keychain initialize
-          app-store-connect fetch-signing-files com.knightleeron.state \
-            --type IOS_APP_STORE \
-            --issuer-id "$ASC_KEY_ISSUER_ID" \
-            --key-id "$ASC_KEY_ID" \
-            --private-key "$ASC_PRIVATE_KEY" \
-            --create
-          echo "✅ Profiles installed:"
-          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null
-          # Configure ONLY the App target with the profile (leaves Pods on Automatic)
-          xcode-project use-profiles \
-            --project "$APP_ROOT/ios/App/App.xcodeproj"
+ExecuteExternalTool /Applications/Xcode-26.2.app/Contents/Developer/Toolchains/XcodeDefault.xctoolchain/usr/bin/ld -version_details
 
-      # ─── 6. Set build number ──────────────────────────────────────────────
-      - name: Set build number
-        script: |
-          cd $APP_ROOT/ios/App
-          agvtool new-version -all $BUILD_NUMBER
-          echo "✅ Build number: $BUILD_NUMBER"
+ExecuteExternalTool /Applications/Xcode-26.2.app/Contents/Developer/usr/bin/actool --version --output-format xml1
 
-      # ─── 7. Build iOS archive ─────────────────────────────────────────────
-      # No manual signing flags — use-profiles already configured the project
-      - name: Build iOS
-        script: |
-          set -e
-          cd $APP_ROOT/ios/App
+Build description signature: 83d3a7cc27b03407dfb5dd35ad4f8a15
+Build description path: /Users/builder/Library/Developer/Xcode/DerivedData/App-gupsofoltzomqtazdjwlduwfyyko/Build/Intermediates.noindex/ArchiveIntermediates/App/IntermediateBuildFilesPath/XCBuildData/83d3a7cc27b03407dfb5dd35ad4f8a15.xcbuilddata
+/Users/builder/clone/heartfelt-check-in-main/ios/App/App.xcodeproj: error: No profiles for 'com.knightleeron.state' were found: Xcode couldn't find any iOS App Development provisioning profiles matching 'com.knightleeron.state'. Automatic signing is disabled and unable to generate a profile. To enable automatic signing, pass -allowProvisioningUpdates to xcodebuild. (in target 'App' from project 'App')
+warning: Run script build phase '[CP] Embed Pods Frameworks' will be run during every build because it does not specify any outputs. To address this issue, either add output dependencies to the script phase, or configure it to run in every build by unchecking "Based on dependency analysis" in the script phase. (in target 'App' from project 'App')
+** ARCHIVE FAILED **
 
-          xcodebuild \
-            -workspace App.xcworkspace \
-            -scheme App \
-            -configuration Release \
-            -destination "generic/platform=iOS" \
-            -archivePath "$ARCHIVE_PATH" \
-            DEVELOPMENT_TEAM=83U7FNH93D \
-            ONLY_ACTIVE_ARCH=NO \
-            clean archive 2>&1
 
-          echo "✅ Verifying archive:"
-          ls -la "$ARCHIVE_PATH" || (echo "❌ Archive not created!" && exit 1)
+The following build commands failed:
+	Archiving workspace App with scheme App
+(1 failure)
 
-          echo "✅ Web assets in archive:"
-          find "$ARCHIVE_PATH" -name "index.html" 2>/dev/null || \
-            echo "⚠️ index.html NOT found — blank screen will occur"
 
-          echo "✅ Icons in archive:"
-          find "$ARCHIVE_PATH" -name "*.png" 2>/dev/null | grep -i icon | head -5
-
-      # ─── 8. Export IPA ────────────────────────────────────────────────────
-      - name: Export IPA
-        script: |
-          set -e
-          PLIST_PATH="$CM_BUILD_DIR/$APP_ROOT/ios/App/ExportOptions.plist"
-
-          ls -la "$ARCHIVE_PATH" || (echo "❌ Archive not found!" && exit 1)
-          ls -la "$PLIST_PATH" || (echo "❌ ExportOptions.plist not found!" && exit 1)
-
-          xcodebuild -exportArchive \
-            -archivePath "$ARCHIVE_PATH" \
-            -exportPath "$EXPORT_PATH" \
-            -exportOptionsPlist "$PLIST_PATH"
-
-          echo "✅ IPA exported:"
-          ls -la "$EXPORT_PATH/"
-
-    artifacts:
-      - /tmp/ipa-export/*.ipa
-      - /tmp/App.xcarchive/**
-
-    publishing:
-      app_store_connect:
-        api_key: $ASC_PRIVATE_KEY
-        key_id: $ASC_KEY_ID
-        issuer_id: $ASC_KEY_ISSUER_ID
-        submit_to_testflight: true
+Build failed :|
+Step 8 script `Build iOS` exited with status code 65
