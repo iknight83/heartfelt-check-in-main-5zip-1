@@ -46,8 +46,7 @@ workflows:
           sed -i '' "s/platform :ios, '[0-9.]*'/platform :ios, '16.0'/" "$PODFILE"
           npx cap copy ios
           test -f ios/App/App/public/index.html || (echo "❌ index.html missing" && exit 1)
-          echo "✅ Web assets copied:"
-          ls ios/App/App/public/
+          echo "✅ Web assets copied"
           cd ios/App
           pod install --repo-update
 
@@ -61,38 +60,40 @@ workflows:
 
       - name: Set up code signing
         script: |
+          # keychain initialize auto-imports the certificate uploaded via Codemagic UI
           keychain initialize
 
-          # Import the distribution certificate uploaded to Codemagic
-          # These variables come from the ios_signing group
-          echo "$CM_CERTIFICATE" | base64 --decode > /tmp/dist_cert.p12
-          keychain add-certificates \
-            --certificate /tmp/dist_cert.p12 \
-            --certificate-password "$CM_CERTIFICATE_PASSWORD"
-          echo "✅ Certificate imported to keychain"
+          echo "=== Checking env vars ==="
+          echo "ASC_PRIVATE_KEY length: ${#ASC_PRIVATE_KEY}"
 
-          # Install the provisioning profile uploaded to Codemagic
-          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
-          mkdir -p "$PROFILES_DIR"
-          echo "$CM_PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/state_appstore.mobileprovision"
-          echo "✅ Profile installed:"
-          ls -la "$PROFILES_DIR/"
+          # fetch-signing-files downloads the App Store provisioning profile
+          # Uses hardcoded key-id and issuer-id to avoid empty variable issues
+          app-store-connect fetch-signing-files com.knightleeron.state \
+            --type IOS_APP_STORE \
+            --issuer-id 792a7c6b-188d-4d18-a896-14c60eaa6c0f \
+            --key-id 3XD237L64Y \
+            --private-key @env:ASC_PRIVATE_KEY \
+            --create
 
-          # Configure the Xcode project to use the installed profile
+          echo "=== Profiles on disk ==="
+          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "⚠️ NO PROFILES"
+
+          echo "=== Certificates in keychain ==="
+          security find-identity -v -p codesigning 2>/dev/null | head -10
+
+          # Configure Xcode project with the downloaded profile
           xcode-project use-profiles
-          echo "✅ Project signing configured"
+          echo "✅ Signing configured"
 
       - name: Set build number
         script: |
           cd $APP_ROOT/ios/App
           agvtool new-version -all $BUILD_NUMBER
-          echo "✅ Build number: $BUILD_NUMBER"
 
       - name: Build iOS
         script: |
           set -e
           cd $APP_ROOT/ios/App
-          # No -allowProvisioningUpdates needed — cert in keychain, profile on disk
           xcodebuild \
             -workspace App.xcworkspace \
             -scheme App \
