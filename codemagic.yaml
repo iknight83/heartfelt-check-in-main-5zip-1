@@ -15,6 +15,9 @@ workflows:
         APP_ROOT: heartfelt-check-in-main
         ARCHIVE_PATH: /tmp/App.xcarchive
         EXPORT_PATH: /tmp/ipa-export
+        # Hardcoded — these are known values that don't change
+        ASC_KEY_ID_VALUE: 3XD237L64Y
+        ASC_ISSUER_ID_VALUE: 792a7c6b-188d-4d18-a896-14c60eaa6c0f
 
     scripts:
 
@@ -89,7 +92,10 @@ workflows:
           keychain initialize
           # Write ASC private key to file for xcodebuild -allowProvisioningUpdates
           echo "$ASC_PRIVATE_KEY" > /tmp/asc_key.p8
-          echo "✅ ASC key written to /tmp/asc_key.p8"
+          chmod 600 /tmp/asc_key.p8
+          echo "✅ Key ID: $ASC_KEY_ID_VALUE"
+          echo "✅ Issuer ID: $ASC_ISSUER_ID_VALUE"
+          echo "✅ Key file size: $(wc -c < /tmp/asc_key.p8) bytes"
 
       # ─── 6. Set build number ──────────────────────────────────────────────
       - name: Set build number
@@ -99,8 +105,6 @@ workflows:
           echo "✅ Build number: $BUILD_NUMBER"
 
       # ─── 7. Build iOS archive ─────────────────────────────────────────────
-      # -allowProvisioningUpdates lets Xcode fetch + install the profile itself
-      # using the ASC key — no manual profile installation needed
       - name: Build iOS
         script: |
           set -e
@@ -114,8 +118,8 @@ workflows:
             -archivePath "$ARCHIVE_PATH" \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/asc_key.p8 \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_KEY_ISSUER_ID" \
+            -authenticationKeyID "$ASC_KEY_ID_VALUE" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID_VALUE" \
             DEVELOPMENT_TEAM=83U7FNH93D \
             CODE_SIGN_STYLE=Automatic \
             ONLY_ACTIVE_ARCH=NO \
@@ -146,8 +150,8 @@ workflows:
             -exportOptionsPlist "$PLIST_PATH" \
             -allowProvisioningUpdates \
             -authenticationKeyPath /tmp/asc_key.p8 \
-            -authenticationKeyID "$ASC_KEY_ID" \
-            -authenticationKeyIssuerID "$ASC_KEY_ISSUER_ID"
+            -authenticationKeyID "$ASC_KEY_ID_VALUE" \
+            -authenticationKeyIssuerID "$ASC_ISSUER_ID_VALUE"
 
           echo "✅ IPA exported:"
           ls -la "$EXPORT_PATH/"
