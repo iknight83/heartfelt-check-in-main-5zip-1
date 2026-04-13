@@ -18,7 +18,6 @@ workflows:
 
     scripts:
 
-      # ─── 1. Install JS dependencies ───────────────────────────────────────
       - name: Install dependencies
         script: |
           cd $APP_ROOT
@@ -27,7 +26,6 @@ workflows:
           echo "✅ @capacitor/ios installed:"
           ls node_modules/@capacitor/ios/scripts/pods_helpers.rb
 
-      # ─── 2. Build web assets ──────────────────────────────────────────────
       - name: Build web app
         script: |
           cd $APP_ROOT
@@ -36,91 +34,57 @@ workflows:
           ls -la dist/
           test -f dist/index.html || (echo "❌ FATAL: dist/index.html missing" && exit 1)
 
-      # ─── 3. Sync iOS ──────────────────────────────────────────────────────
       - name: Sync iOS
         script: |
           cd $APP_ROOT
-
           NM="$(pwd)/node_modules"
           PODFILE="ios/App/Podfile"
-
           sed -i '' \
             "s|require_relative '\.\./\.\./\.\./node_modules|require_relative '${NM}|g; \
              s|require_relative '\.\./\.\./node_modules|require_relative '${NM}|g; \
              s|:path => '\.\./\.\./\.\./node_modules|:path => '${NM}|g; \
              s|:path => '\.\./\.\./node_modules|:path => '${NM}|g" \
             "$PODFILE"
-
           sed -i '' "s/platform :ios, '[0-9.]*'/platform :ios, '16.0'/" "$PODFILE"
-
           echo "✅ Podfile head:"
           head -5 "$PODFILE"
-
           npx cap copy ios
-
           echo "✅ iOS public folder:"
           ls -la ios/App/App/public/
-          test -f ios/App/App/public/index.html || \
-            (echo "❌ FATAL: index.html missing after cap copy" && exit 1)
-
+          test -f ios/App/App/public/index.html || (echo "❌ FATAL: index.html missing" && exit 1)
           cd ios/App
           pod install --repo-update
           echo "✅ Pod install complete"
 
-      # ─── 4. Fix deployment target in Xcode project ────────────────────────
       - name: Fix deployment target in Xcode project
         script: |
           cd $APP_ROOT
-          sed -i '' \
-            's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 16.0;/g' \
-            ios/App/App.xcodeproj/project.pbxproj
-          sed -i '' \
-            's/ASSETCATALOG_COMPILER_APPICON_NAME = [^;]*;/ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;/g' \
-            ios/App/App.xcodeproj/project.pbxproj
-
+          sed -i '' 's/IPHONEOS_DEPLOYMENT_TARGET = [0-9.]*;/IPHONEOS_DEPLOYMENT_TARGET = 16.0;/g' ios/App/App.xcodeproj/project.pbxproj
+          sed -i '' 's/ASSETCATALOG_COMPILER_APPICON_NAME = [^;]*;/ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;/g' ios/App/App.xcodeproj/project.pbxproj
+          sed -i '' 's/CODE_SIGN_STYLE = Manual;/CODE_SIGN_STYLE = Automatic;/g' ios/App/App.xcodeproj/project.pbxproj
           echo "✅ Deployment targets:"
           grep "IPHONEOS_DEPLOYMENT_TARGET" ios/App/App.xcodeproj/project.pbxproj | head -4
           echo "✅ AppIcon:"
           grep "ASSETCATALOG_COMPILER_APPICON_NAME" ios/App/App.xcodeproj/project.pbxproj
+          echo "✅ Code sign style:"
+          grep "CODE_SIGN_STYLE" ios/App/App.xcodeproj/project.pbxproj | head -4
 
-      # ─── 5. Set up code signing ───────────────────────────────────────────
-      # Python writes the .p8 key correctly — echo/printf corrupt newlines
       - name: Set up code signing
         script: |
           keychain initialize
-          python3 - << 'PYEOF'
-import os, sys
-key = os.environ.get('ASC_PRIVATE_KEY', '')
-if not key:
-    print('ERROR: ASC_PRIVATE_KEY is empty')
-    sys.exit(1)
-# Replace escaped newlines with real newlines
-key = key.replace('\\n', '\n')
-with open('/tmp/asc_key.p8', 'w') as f:
-    f.write(key)
-    if not key.endswith('\n'):
-        f.write('\n')
-print(f'Key written: {len(key)} bytes')
-print(f'First line: {key.split(chr(10))[0]}')
-print(f'Last line:  {key.strip().split(chr(10))[-1]}')
-PYEOF
+          python3 -c "import os; k=os.environ.get('ASC_PRIVATE_KEY',''); k=k.replace('\\n','\n') if '\\n' in k else k; open('/tmp/asc_key.p8','w').write(k+'\n' if not k.endswith('\n') else k); print('Key written:',len(k),'bytes'); print('First line:',k.split('\n')[0])"
           chmod 600 /tmp/asc_key.p8
 
-      # ─── 6. Set build number ──────────────────────────────────────────────
       - name: Set build number
         script: |
           cd $APP_ROOT/ios/App
           agvtool new-version -all $BUILD_NUMBER
           echo "✅ Build number: $BUILD_NUMBER"
 
-      # ─── 7. Build iOS archive ─────────────────────────────────────────────
-      # CODE_SIGN_STYLE=Automatic — Xcode handles all targets (App + Pods)
-      # -allowProvisioningUpdates — Xcode fetches/installs profile from Apple
       - name: Build iOS
         script: |
           set -e
           cd $APP_ROOT/ios/App
-
           xcodebuild \
             -workspace App.xcworkspace \
             -scheme App \
@@ -135,26 +99,19 @@ PYEOF
             CODE_SIGN_STYLE=Automatic \
             ONLY_ACTIVE_ARCH=NO \
             clean archive 2>&1
-
           echo "✅ Verifying archive:"
           ls -la "$ARCHIVE_PATH" || (echo "❌ Archive not created!" && exit 1)
-
           echo "✅ Web assets in archive:"
-          find "$ARCHIVE_PATH" -name "index.html" 2>/dev/null || \
-            echo "⚠️ index.html NOT found — blank screen will occur"
-
+          find "$ARCHIVE_PATH" -name "index.html" 2>/dev/null || echo "⚠️ index.html NOT found — blank screen will occur"
           echo "✅ Icons in archive:"
           find "$ARCHIVE_PATH" -name "*.png" 2>/dev/null | grep -i icon | head -5
 
-      # ─── 8. Export IPA ────────────────────────────────────────────────────
       - name: Export IPA
         script: |
           set -e
           PLIST_PATH="$CM_BUILD_DIR/$APP_ROOT/ios/App/ExportOptions.plist"
-
           ls -la "$ARCHIVE_PATH" || (echo "❌ Archive not found!" && exit 1)
           ls -la "$PLIST_PATH" || (echo "❌ ExportOptions.plist not found!" && exit 1)
-
           xcodebuild -exportArchive \
             -archivePath "$ARCHIVE_PATH" \
             -exportPath "$EXPORT_PATH" \
@@ -163,7 +120,6 @@ PYEOF
             -authenticationKeyPath /tmp/asc_key.p8 \
             -authenticationKeyID 3XD237L64Y \
             -authenticationKeyIssuerID 792a7c6b-188d-4d18-a896-14c60eaa6c0f
-
           echo "✅ IPA exported:"
           ls -la "$EXPORT_PATH/"
 
