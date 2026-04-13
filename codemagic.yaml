@@ -61,22 +61,24 @@ workflows:
         script: |
           keychain initialize
 
-          echo "=== Checking env vars ==="
-          echo "ASC_PRIVATE_KEY length: ${#ASC_PRIVATE_KEY}"
-          echo "ASC_KEY_ID: $ASC_KEY_ID"
+          # Import distribution certificate
+          echo "$CM_CERTIFICATE" | base64 --decode > /tmp/dist_cert.p12
+          keychain add-certificates \
+            --certificate /tmp/dist_cert.p12 \
+            --certificate-password "$CM_CERTIFICATE_PASSWORD"
+          echo "✅ Certificate imported"
 
-          app-store-connect fetch-signing-files com.knightleeron.state \
-            --type IOS_APP_STORE \
-            --issuer-id 792a7c6b-188d-4d18-a896-14c60eaa6c0f \
-            --key-id 3XD237L64Y \
-            --private-key @env:ASC_PRIVATE_KEY \
-            --create
-
-          echo "=== Profiles on disk ==="
-          ls -la ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "⚠️ NO PROFILES"
+          # Install provisioning profile
+          PROFILES_DIR="$HOME/Library/MobileDevice/Provisioning Profiles"
+          mkdir -p "$PROFILES_DIR"
+          echo "$CM_PROVISIONING_PROFILE" | base64 --decode > "$PROFILES_DIR/state_appstore.mobileprovision"
+          echo "✅ Profile installed"
 
           echo "=== Certificates in keychain ==="
           security find-identity -v -p codesigning 2>/dev/null | head -10
+
+          echo "=== Profile on disk ==="
+          ls -la "$PROFILES_DIR/"
 
           xcode-project use-profiles
           echo "✅ Signing configured"
