@@ -13,6 +13,8 @@ workflows:
         - ios_signing
       vars:
         APP_ROOT: heartfelt-check-in-main
+        ARCHIVE_PATH: /tmp/App.xcarchive
+        EXPORT_PATH: /tmp/ipa-export
 
     scripts:
 
@@ -104,8 +106,10 @@ workflows:
       # ─── 7. Build iOS archive ─────────────────────────────────────────────
       - name: Build iOS
         script: |
+          set -e
           cd $APP_ROOT/ios/App
 
+          echo "✅ Archive will be saved to: $ARCHIVE_PATH"
           echo "✅ Available schemes:"
           xcodebuild -workspace App.xcworkspace -list 2>&1
 
@@ -114,7 +118,7 @@ workflows:
             -scheme App \
             -configuration Release \
             -destination "generic/platform=iOS" \
-            -archivePath $CM_BUILD_DIR/App.xcarchive \
+            -archivePath "$ARCHIVE_PATH" \
             DEVELOPMENT_TEAM=83U7FNH93D \
             CODE_SIGN_STYLE=Manual \
             CODE_SIGN_IDENTITY="Apple Distribution" \
@@ -122,32 +126,39 @@ workflows:
             ONLY_ACTIVE_ARCH=NO \
             clean archive 2>&1
 
+          echo "✅ Verifying archive exists:"
+          ls -la "$ARCHIVE_PATH" || (echo "❌ Archive not created!" && exit 1)
+
           echo "✅ Confirming web assets in archive:"
-          find $CM_BUILD_DIR/App.xcarchive -name "index.html" 2>/dev/null || \
+          find "$ARCHIVE_PATH" -name "index.html" 2>/dev/null || \
             echo "⚠️ index.html NOT found in archive — blank screen will occur"
 
           echo "✅ Confirming icons in archive:"
-          find $CM_BUILD_DIR/App.xcarchive -name "*.png" 2>/dev/null | grep -i icon | head -5
+          find "$ARCHIVE_PATH" -name "*.png" 2>/dev/null | grep -i icon | head -5
 
       # ─── 8. Export IPA ────────────────────────────────────────────────────
       - name: Export IPA
         script: |
-          echo "CM_BUILD_DIR: $CM_BUILD_DIR"
+          set -e
           PLIST_PATH="$CM_BUILD_DIR/$APP_ROOT/ios/App/ExportOptions.plist"
-          echo "Looking for plist at: $PLIST_PATH"
+
+          echo "✅ Archive path: $ARCHIVE_PATH"
+          echo "✅ Plist path: $PLIST_PATH"
+
+          ls -la "$ARCHIVE_PATH" || (echo "❌ Archive not found!" && exit 1)
           ls -la "$PLIST_PATH" || (echo "❌ ExportOptions.plist not found!" && exit 1)
 
           xcodebuild -exportArchive \
-            -archivePath $CM_BUILD_DIR/App.xcarchive \
-            -exportPath $CM_BUILD_DIR/export \
+            -archivePath "$ARCHIVE_PATH" \
+            -exportPath "$EXPORT_PATH" \
             -exportOptionsPlist "$PLIST_PATH"
 
           echo "✅ IPA exported:"
-          ls -la $CM_BUILD_DIR/export/
+          ls -la "$EXPORT_PATH/"
 
     artifacts:
-      - $CM_BUILD_DIR/export/*.ipa
-      - $CM_BUILD_DIR/App.xcarchive/**
+      - /tmp/ipa-export/*.ipa
+      - /tmp/App.xcarchive/**
 
     publishing:
       app_store_connect:
