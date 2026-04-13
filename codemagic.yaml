@@ -15,9 +15,6 @@ workflows:
         APP_ROOT: heartfelt-check-in-main
         ARCHIVE_PATH: /tmp/App.xcarchive
         EXPORT_PATH: /tmp/ipa-export
-        # Hardcoded — these are known values that don't change
-        ASC_KEY_ID_VALUE: 3XD237L64Y
-        ASC_ISSUER_ID_VALUE: 792a7c6b-188d-4d18-a896-14c60eaa6c0f
 
     scripts:
 
@@ -87,15 +84,20 @@ workflows:
           grep "ASSETCATALOG_COMPILER_APPICON_NAME" ios/App/App.xcodeproj/project.pbxproj
 
       # ─── 5. Set up code signing ───────────────────────────────────────────
+      # @env: syntax reads key directly from env var — avoids PEM newline corruption
       - name: Set up code signing
         script: |
           keychain initialize
-          # Write ASC private key to file for xcodebuild -allowProvisioningUpdates
-          echo "$ASC_PRIVATE_KEY" > /tmp/asc_key.p8
-          chmod 600 /tmp/asc_key.p8
-          echo "✅ Key ID: $ASC_KEY_ID_VALUE"
-          echo "✅ Issuer ID: $ASC_ISSUER_ID_VALUE"
-          echo "✅ Key file size: $(wc -c < /tmp/asc_key.p8) bytes"
+          app-store-connect fetch-signing-files com.knightleeron.state \
+            --type IOS_APP_STORE \
+            --issuer-id 792a7c6b-188d-4d18-a896-14c60eaa6c0f \
+            --key-id 3XD237L64Y \
+            --private-key @env:ASC_PRIVATE_KEY \
+            --create
+          echo "✅ Profiles installed:"
+          ls ~/Library/MobileDevice/Provisioning\ Profiles/ 2>/dev/null || echo "No profiles found"
+          xcode-project use-profiles
+          echo "✅ Signing configured"
 
       # ─── 6. Set build number ──────────────────────────────────────────────
       - name: Set build number
@@ -105,6 +107,7 @@ workflows:
           echo "✅ Build number: $BUILD_NUMBER"
 
       # ─── 7. Build iOS archive ─────────────────────────────────────────────
+      # No signing flags needed — use-profiles already configured the project
       - name: Build iOS
         script: |
           set -e
@@ -116,12 +119,7 @@ workflows:
             -configuration Release \
             -destination "generic/platform=iOS" \
             -archivePath "$ARCHIVE_PATH" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath /tmp/asc_key.p8 \
-            -authenticationKeyID "$ASC_KEY_ID_VALUE" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID_VALUE" \
             DEVELOPMENT_TEAM=83U7FNH93D \
-            CODE_SIGN_STYLE=Automatic \
             ONLY_ACTIVE_ARCH=NO \
             clean archive 2>&1
 
@@ -147,11 +145,7 @@ workflows:
           xcodebuild -exportArchive \
             -archivePath "$ARCHIVE_PATH" \
             -exportPath "$EXPORT_PATH" \
-            -exportOptionsPlist "$PLIST_PATH" \
-            -allowProvisioningUpdates \
-            -authenticationKeyPath /tmp/asc_key.p8 \
-            -authenticationKeyID "$ASC_KEY_ID_VALUE" \
-            -authenticationKeyIssuerID "$ASC_ISSUER_ID_VALUE"
+            -exportOptionsPlist "$PLIST_PATH"
 
           echo "✅ IPA exported:"
           ls -la "$EXPORT_PATH/"
