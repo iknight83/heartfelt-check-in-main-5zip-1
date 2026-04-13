@@ -7,7 +7,7 @@
     "server": "cd heartfelt-check-in-main && npm run server"
   },
   "dependencies": {
-    "@capacitor/cli": "^7.5.0",
+    "@capacitor/cli": "^8.1.0",
     "@capacitor/core": "^8.1.0",
     "@capacitor/ios": "^8.1.0",
     "@paypal/paypal-server-sdk": "^2.2.0",
