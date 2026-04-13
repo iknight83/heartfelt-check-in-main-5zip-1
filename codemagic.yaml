@@ -85,7 +85,6 @@ workflows:
       - name: Set up code signing
         script: |
           keychain initialize
-          # Fetch and install signing files (downloads profile to ~/Library/MobileDevice/Provisioning Profiles/)
           app-store-connect fetch-signing-files com.knightleeron.state \
             --type IOS_APP_STORE \
             --issuer-id "$ASC_KEY_ISSUER_ID" \
@@ -103,13 +102,9 @@ workflows:
           echo "✅ Build number: $BUILD_NUMBER"
 
       # ─── 7. Build iOS archive ─────────────────────────────────────────────
-      # xcpretty REMOVED intentionally — we need the full raw output to debug
       - name: Build iOS
         script: |
           cd $APP_ROOT/ios/App
-
-          echo "✅ Workspace contents:"
-          ls -la
 
           echo "✅ Available schemes:"
           xcodebuild -workspace App.xcworkspace -list 2>&1
@@ -137,10 +132,15 @@ workflows:
       # ─── 8. Export IPA ────────────────────────────────────────────────────
       - name: Export IPA
         script: |
+          echo "CM_BUILD_DIR: $CM_BUILD_DIR"
+          PLIST_PATH="$CM_BUILD_DIR/$APP_ROOT/ios/App/ExportOptions.plist"
+          echo "Looking for plist at: $PLIST_PATH"
+          ls -la "$PLIST_PATH" || (echo "❌ ExportOptions.plist not found!" && exit 1)
+
           xcodebuild -exportArchive \
             -archivePath $CM_BUILD_DIR/App.xcarchive \
             -exportPath $CM_BUILD_DIR/export \
-            -exportOptionsPlist "$CM_BUILD_DIR/../../$APP_ROOT/ios/App/ExportOptions.plist"
+            -exportOptionsPlist "$PLIST_PATH"
 
           echo "✅ IPA exported:"
           ls -la $CM_BUILD_DIR/export/
