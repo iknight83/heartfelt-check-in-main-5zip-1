@@ -10,7 +10,6 @@ workflows:
       cocoapods: default
       groups:
         - app_store_credentials
-        - ios_signing
       vars:
         APP_ROOT: heartfelt-check-in-main
         ARCHIVE_PATH: /tmp/App.xcarchive
@@ -60,14 +59,12 @@ workflows:
 
       - name: Set up code signing
         script: |
-          # keychain initialize auto-imports the certificate uploaded via Codemagic UI
           keychain initialize
 
           echo "=== Checking env vars ==="
           echo "ASC_PRIVATE_KEY length: ${#ASC_PRIVATE_KEY}"
+          echo "ASC_KEY_ID: $ASC_KEY_ID"
 
-          # fetch-signing-files downloads the App Store provisioning profile
-          # Uses hardcoded key-id and issuer-id to avoid empty variable issues
           app-store-connect fetch-signing-files com.knightleeron.state \
             --type IOS_APP_STORE \
             --issuer-id 792a7c6b-188d-4d18-a896-14c60eaa6c0f \
@@ -81,7 +78,6 @@ workflows:
           echo "=== Certificates in keychain ==="
           security find-identity -v -p codesigning 2>/dev/null | head -10
 
-          # Configure Xcode project with the downloaded profile
           xcode-project use-profiles
           echo "✅ Signing configured"
 
